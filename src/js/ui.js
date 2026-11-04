@@ -160,6 +160,8 @@
       }
     });
     document.addEventListener('pointerdown', () => GM.Audio.unlock(), { once: true });
+    root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); UI.installPrompt = e; });
+    root.addEventListener('appinstalled', () => { UI.installPrompt = null; UI.toast('📲 ¡App instalada!', 'good'); });
     UI.setTab(UI.tab);
     UI.refresh(true);
   };
@@ -236,6 +238,8 @@
       case 'savenow': host.save(true); UI.toast('Partida guardada.', 'good'); sound = 'click'; break;
       case 'wipe': resetGame(); sound = 'click'; break;
       case 'cloud': host.cloud(id); sound = 'click'; break;
+      case 'share': shareGame(); sound = 'click'; break;
+      case 'install': installApp(); sound = 'click'; break;
       default: sound = 'click';
     }
     GM.Audio.play(ok ? sound : 'deny');
@@ -297,25 +301,91 @@
       });
   }
 
+  /** Estamos dentro de una página de claude.ai (allí no hay descargas ni enlaces propios). */
+  const inClaude = () => !!(root.claude && typeof root.claude.use === 'function');
+  /** Página web normal (https/http) fuera de claude.ai: se pueden descargar archivos y compartir el enlace. */
+  const onWeb = () => !inClaude() && /^https?:$/.test(root.location.protocol);
+
+  /** Copia texto al portapapeles (con alternativa para navegadores que lo impiden). @returns {Promise<boolean>} */
+  function copyText(text, fallbackEl) {
+    const fallback = () => {
+      try {
+        if (fallbackEl) fallbackEl.select();
+        return document.execCommand('copy');
+      } catch (e) { return false; }
+    };
+    try {
+      return navigator.clipboard.writeText(text).then(() => true, () => fallback());
+    } catch (e) { return Promise.resolve(fallback()); }
+  }
+
+  /** Descarga un texto como archivo. */
+  function downloadText(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  /** Enlace que abre el juego con esta partida (solo en la web normal). */
+  UI.saveLink = function (code) {
+    return root.location.origin + root.location.pathname + root.location.search + '#save=' + encodeURIComponent(code);
+  };
+
   function exportSave() {
     const code = GM.exportSave(S);
+    const web = onWeb();
+    const buttons = [{ label: 'Copiar código', cls: 'primary', value: 'copy' }];
+    if (!inClaude()) buttons.push({ label: 'Descargar archivo', value: 'file' });
+    if (web) buttons.push({ label: 'Copiar enlace', value: 'link' });
+    buttons.push({ label: 'Cerrar', value: false });
     UI.modal({ title: 'Exportar partida', wide: true,
-      html: `<p>Copia este código y guárdalo donde quieras. Sirve para pasar tu partida a otro dispositivo.</p>
-        <textarea id="exp" readonly rows="6">${code}</textarea>`,
-      buttons: [{ label: 'Copiar', cls: 'primary', value: 'copy' }, { label: 'Cerrar', value: false }],
+      html: `<p>Lleva tu partida a otro dispositivo (o guárdala como copia de seguridad):</p>
+        <ul class="tight"><li><b>Código</b>: cópialo y pégalo en <i>Más → Importar</i>.</li>
+        ${inClaude() ? '' : '<li><b>Archivo</b>: se descarga un .txt que puedes importar luego.</li>'}
+        ${web ? '<li><b>Enlace</b>: ábrelo en el otro dispositivo y se carga tu partida. Quien tenga el enlace puede cargarla, así que no lo publiques.</li>' : ''}</ul>
+        <textarea id="exp" readonly rows="4">${code}</textarea>`,
+      buttons: buttons,
       onClose: (v, m) => {
-        if (v !== 'copy') return true;
-        const ta = $('#exp', m); ta.select();
-        try { navigator.clipboard.writeText(code).catch(() => { try { document.execCommand('copy'); } catch (e2) { /* se puede copiar a mano */ } }); } catch (e) { try { document.execCommand('copy'); } catch (e2) { /* se puede copiar a mano */ } }
-        UI.toast('Código copiado.', 'good');
-        return false;
+        if (v === 'copy') {
+          copyText(code, $('#exp', m)).then((ok) => UI.toast(ok ? 'Código copiado.' : 'Selecciona el texto y cópialo a mano.', ok ? 'good' : 'warn'));
+          return false;
+        }
+        if (v === 'file') {
+          const d = new Date();
+          downloadText(`gremio-partida-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.txt`, code);
+          UI.toast('Archivo descargado.', 'good');
+          return false;
+        }
+        if (v === 'link') {
+          copyText(UI.saveLink(code)).then((ok) => UI.toast(ok ? 'Enlace copiado.' : 'No se pudo copiar el enlace.', ok ? 'good' : 'warn'));
+          return false;
+        }
+        return true;
       } });
   }
 
   function importSave() {
     UI.modal({ title: 'Importar partida', wide: true,
-      html: '<p>Pega aquí tu código. <b>Sustituirá la partida actual.</b></p><textarea id="imp" rows="6" placeholder="Pega el código..."></textarea><p id="imp-err" class="bad"></p>',
+      html: `<p>Pega aquí tu código o elige un archivo. <b>Sustituirá la partida actual.</b></p>
+        <textarea id="imp" rows="5" placeholder="Pega el código..."></textarea>
+        ${inClaude() ? '' : '<p><button class="btn small" id="impbtn" type="button">Elegir archivo…</button><input type="file" id="impfile" accept=".txt,.json,text/plain,application/json" hidden></p>'}
+        <p id="imp-err" class="bad"></p>`,
       buttons: [{ label: 'Cancelar', value: false }, { label: 'Importar', cls: 'primary', value: 'ok' }],
+      onOpen: (m) => {
+        const btn = $('#impbtn', m), file = $('#impfile', m);
+        if (!btn || !file) return;
+        btn.addEventListener('click', () => file.click());
+        file.addEventListener('change', () => {
+          const f = file.files && file.files[0];
+          if (!f) return;
+          if (f.size > 400000) { $('#imp-err', m).textContent = 'Ese archivo es demasiado grande.'; return; }
+          const rd = new FileReader();
+          rd.onload = () => { $('#imp', m).value = String(rd.result || '').trim(); $('#imp-err', m).textContent = ''; };
+          rd.readAsText(f);
+        });
+      },
       onClose: (v, m) => {
         if (v !== 'ok') return true;
         try {
@@ -328,6 +398,17 @@
           return false;
         }
       } });
+  }
+
+  /** Invita a un amigo: abre el menú de compartir del móvil o copia el enlace del juego. */
+  function shareGame() {
+    const url = root.location.origin + root.location.pathname;
+    const data = { title: 'Gremio de Mala Muerte', text: 'Juega gratis a este incremental de rol con humor. Cada persona tiene su propia partida:', url: url };
+    if (navigator.share) {
+      navigator.share(data).catch(() => { /* el jugador canceló */ });
+    } else {
+      copyText(url).then((ok) => UI.toast(ok ? '📣 Enlace copiado. ¡Pásaselo a tus amigos!' : 'Copia la dirección de la barra del navegador.', ok ? 'good' : 'warn'));
+    }
   }
 
   function resetGame() {
@@ -468,6 +549,20 @@
     return rows;
   }
 
+  /** Instalación como app: botón si el navegador la ofrece, instrucciones si no. */
+  function installRow() {
+    const can = !!UI.installPrompt;
+    const text = can ? 'Añádelo a tu pantalla de inicio y juega como una app, también sin conexión.'
+      : 'En el móvil: menú del navegador → «Añadir a pantalla de inicio». En el PC: icono de instalar en la barra de direcciones.';
+    return { key: 'install', cls: 'card', html: `<div class="ico">📲</div><div class="grow"><b>Instalar como app</b><div class="muted">${text}</div></div>${can ? '<div class="actions"><button class="btn small" data-act="install">Instalar</button></div>' : ''}` };
+  }
+  function installApp() {
+    const ev = UI.installPrompt;
+    if (!ev) return;
+    UI.installPrompt = null;
+    try { ev.prompt(); } catch (e) { /* nada */ }
+  }
+
   /** Fila de estado de la nube (Más → Partida en la nube). */
   function cloudRow() {
     const C = GM.Cloud;
@@ -496,6 +591,10 @@
     rows.push({ key: 'save', cls: 'card', html: `<div class="ico">💾</div><div class="grow"><b>Partida</b><div class="muted">Se guarda sola cada pocos segundos en este navegador.</div></div>
       <div class="actions"><button class="btn small" data-act="savenow">Guardar</button><button class="btn small" data-act="export">Exportar</button><button class="btn small" data-act="import">Importar</button></div>` });
     rows.push(cloudRow());
+    if (onWeb()) {
+      rows.push({ key: 'share', cls: 'card', html: `<div class="ico">📣</div><div class="grow"><b>Invitar a un amigo</b><div class="muted">Es gratis y sin cuenta. Cada persona juega su propia partida, que se guarda en su navegador.</div></div><div class="actions"><button class="btn small" data-act="share">Compartir</button></div>` });
+      rows.push(installRow());
+    }
     rows.push({ key: 'h-stat', cls: 'sect', html: '📊 <b>Estadísticas</b>' });
     const lines = [
       ['Tiempo jugado', GM.fmtTime(S.t.played)], ['Piso máximo', st.maxFloor], ['Ascensos', st.ascents], ['Enemigos derrotados', fmt(st.kills)],
@@ -680,6 +779,10 @@
     const mf = S.stats.maxFloor;
     GM.HEROES.forEach((h) => { if (h.hireFloor > 1 && mf >= h.hireFloor && !seen['h' + h.id]) { seen['h' + h.id] = true; GM.Audio.play('unlock'); UI.toast(`🍺 <b>${h.name}</b> (${h.cls}) está en la Taberna.`, 'info'); } });
     GM.BUILDINGS.forEach((b) => { if (b.unlock > 1 && mf >= b.unlock && !seen['b' + b.id]) { seen['b' + b.id] = true; GM.Audio.play('unlock'); UI.toast(`🏗️ Nuevo edificio: <b>${b.name}</b>.`, 'info'); } });
+    if (mf >= 3 && !seen.saveHint && !GM.Cloud.available() && GM.Cloud.status !== 'connecting') {
+      seen.saveHint = true;
+      UI.toast('💾 Tu partida se guarda sola en este navegador. Para jugar en otro dispositivo, usa <b>Más → Exportar</b>.', 'info');
+    }
     if (mf >= 12 && !seen.lib) { seen.lib = true; GM.Audio.play('unlock'); UI.toast('📚 La <b>Biblioteca</b> ya está abierta (Ciudad).', 'info'); }
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

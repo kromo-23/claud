@@ -173,14 +173,48 @@
     },
   };
 
+  /** Código de partida del enlace (#save=...), o null. Limpia la dirección. */
+  function readLinkSave() {
+    const m = /^#save=(.+)$/.exec(root.location.hash || '');
+    if (!m) return null;
+    try { root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { /* nada */ }
+    let code = m[1];
+    try { code = decodeURIComponent(code); } catch (e) { /* se usa tal cual */ }
+    return code.length <= 400000 ? code : '';
+  }
+
+  /** Ofrece cargar la partida que trae el enlace. @returns {Promise<boolean>} true si se cargó. */
+  async function offerLinkImport(code, hadLocal) {
+    let ns;
+    try { ns = GM.importSave(code); } catch (e) { GM.UI.toast('El enlace de partida no es válido.', 'warn'); return false; }
+    const info = { floor: ns.stats.maxFloor, rank: ns.run.rank, played: ns.t.played };
+    const ok = await GM.UI.modal({ title: '📨 Partida en el enlace', wide: true,
+      html: `<p>Este enlace trae una partida: <b>${Cloud.describe(info)}</b>.</p>${hadLocal ? '<p><b>Sustituirá la partida de este navegador.</b></p>' : ''}`,
+      buttons: [{ label: 'No, ignorar', value: false }, { label: 'Cargar esta partida', cls: 'primary', value: true }] });
+    if (!ok) return false;
+    S = ns; S.evOn = true;
+    GM.Audio.set(S.flags.muted, S.flags.vol);
+    GM.UI.setState(S);
+    return true;
+  }
+
   async function boot() {
-    const loaded = load();
+    let loaded = load();
     S = loaded ? loaded.state : GM.newState();
     S.evOn = true;
-    const localAt = loaded ? loaded.state.t.saved : 0;
     GM.Audio.set(S.flags.muted, S.flags.vol);
     GM.UI.init(S, host);
     root.GM.state = function () { return S; };
+
+    // Partida compartida por enlace (#save=...): se ofrece antes de nada.
+    let imported = false;
+    const linkCode = readLinkSave();
+    if (linkCode !== null) {
+      imported = linkCode ? await offerLinkImport(linkCode, !!loaded) : false;
+      if (linkCode === '') GM.UI.toast('El enlace de partida es demasiado grande.', 'warn');
+      if (imported) { loaded = { state: S, fromBackup: false }; }
+    }
+    const localAt = loaded ? loaded.state.t.saved : 0;
 
     // Guardar al ocultar o cerrar la página: se registra ya, sin esperar a la nube.
     document.addEventListener('visibilitychange', () => {

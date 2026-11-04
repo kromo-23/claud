@@ -20,6 +20,15 @@ Un **juego incremental de rol con humor** para móvil y PC. Diriges un gremio de
 
 No necesita instalar nada más: es HTML + JavaScript sin dependencias.
 
+### Jugar con amigos (sin cuenta de claude.ai)
+
+Publica el juego en GitHub Pages (ver la tabla de arriba) y pasa el enlace. Cualquiera puede jugar desde el móvil o el PC **sin cuenta ni instalar nada**:
+
+- **Cada persona tiene su propia partida**, guardada en su navegador. No se mezclan.
+- **Más → Invitar a un amigo** abre el menú de compartir del móvil (o copia el enlace).
+- **Más → Instalar como app** (o «Añadir a pantalla de inicio»): funciona también sin conexión.
+- Para cambiar de dispositivo: **Más → Exportar** da un **código**, un **archivo .txt** o un **enlace** que abre el juego con tu partida (te pregunta antes de reemplazar la que ya tengas). Con **Importar** lo recuperas.
+
 ### Guardado y dispositivos
 
 - Siempre se guarda en el navegador. Con el enlace de claude.ai y la sesión iniciada, **también se sube a tu cuenta** (un documento privado por persona que nadie más puede leer) cada pocos minutos y al ocultar o cerrar la página.
@@ -31,7 +40,7 @@ No necesita instalar nada más: es HTML + JavaScript sin dependencias.
 
 ```bash
 npm test            # 27 pruebas del motor (rápidas)
-npm run test:e2e    # 19 pruebas en navegador real (Playwright), incluida la nube con una base de datos simulada
+npm run test:e2e    # 28 pruebas en navegador real (Playwright): nube simulada, compartir partidas, subcarpeta y modo sin conexión
 npm run sim         # un jugador automático juega la partida entera y mide su duración
 node tools/calibrate.js --write   # recalibra la dificultad por piso (src/js/floors.js)
 npm run build       # un solo archivo en dist/ para publicar como página
