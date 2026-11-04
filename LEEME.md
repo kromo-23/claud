@@ -6,25 +6,32 @@ Un **juego incremental de rol con humor** para móvil y PC. Diriges un gremio de
 - Una ciudad que mejora con el botín: Herrería, Mercado, Mina, Santuario, Barracones y Biblioteca.
 - 5 zonas con reglas propias (veneno, resistencias, furia...) y jefes con diálogos.
 - 4 **Ascensos de Rango** (prestigio) con estrellas ⭐ y 10 talentos permanentes, 28 logros.
-- Guardado automático, exportar/importar partida y **progreso sin conexión** (hasta 8 h).
+- Guardado automático, **guardado en la nube** (tu cuenta de claude.ai: sigues en cualquier dispositivo), exportar/importar y **progreso sin conexión** (hasta 8 h).
 - Pixel art dibujado por código, sonido de 8 bits, sin anuncios ni compras.
 
 ## Cómo jugar
 
 | Dónde | Cómo |
 |---|---|
-| Enlace publicado | Abre la página del juego en el navegador (móvil o PC). |
+| Enlace publicado (claude.ai) | Ábrelo con tu sesión iniciada, en el móvil o en el PC. **Tu partida se guarda en tu cuenta** y te sigue a cualquier dispositivo. |
 | En local | `npm run serve` y abre <http://localhost:8123>. |
-| GitHub Pages | Fusiona en `main` y activa *Ajustes → Pages → Source: GitHub Actions*; el flujo `.github/workflows/pages.yml` lo publica. |
+| GitHub Pages (enlace público, sin cuenta) | Una vez: *Ajustes → Pages → Source: GitHub Actions*. Luego, en la pestaña *Actions*, ejecuta **Publicar el juego en GitHub Pages** (*Run workflow*). Queda en `https://<usuario>.github.io/<repositorio>/`. Aquí no hay nube: la partida se guarda en cada navegador (usa Exportar/Importar para moverla). Si el repositorio es privado, GitHub exige un plan de pago para Pages. |
 | Como app | Desde el navegador, "Añadir a pantalla de inicio" / "Instalar" (funciona sin conexión). |
 
-No necesita instalar nada más: es HTML + JavaScript sin dependencias. Tu partida se guarda en el navegador; usa **Más → Exportar** para pasarla a otro dispositivo.
+No necesita instalar nada más: es HTML + JavaScript sin dependencias.
+
+### Guardado y dispositivos
+
+- Siempre se guarda en el navegador. Con el enlace de claude.ai y la sesión iniciada, **también se sube a tu cuenta** (un documento privado por persona que nadie más puede leer) cada pocos minutos y al ocultar o cerrar la página.
+- Al abrir el juego en otro dispositivo se carga solo la partida de la nube. Si ese dispositivo ya tenía otra partida distinta, el juego **pregunta con cuál seguir** y no pisa nada hasta que decides.
+- Si juegas en dos dispositivos a la vez y uno guarda, el otro te avisa para que elijas.
+- En **Más → Partida en la nube** ves el estado y puedes subir o cargar a mano. **Exportar/Importar** sirve siempre, con o sin cuenta.
 
 ## Desarrollo
 
 ```bash
 npm test            # 27 pruebas del motor (rápidas)
-npm run test:e2e    # 10 pruebas en navegador real con Playwright
+npm run test:e2e    # 19 pruebas en navegador real (Playwright), incluida la nube con una base de datos simulada
 npm run sim         # un jugador automático juega la partida entera y mide su duración
 node tools/calibrate.js --write   # recalibra la dificultad por piso (src/js/floors.js)
 npm run build       # un solo archivo en dist/ para publicar como página
@@ -36,7 +43,8 @@ npm run build       # un solo archivo en dist/ para publicar como página
 | `src/js/floors.js` | Tabla de dificultad por piso (la genera `tools/calibrate.js`). |
 | `src/js/core.js` | Motor: combate, compras, ascenso, sin conexión, guardado. Sin DOM, se prueba en Node. |
 | `src/js/sprites.js`, `scene.js` | Pixel art por código y escena de combate. |
-| `src/js/ui.js`, `main.js` | Interfaz, ventanas, bucle de juego. |
+| `src/js/ui.js`, `main.js` | Interfaz, ventanas, bucle de juego y guardado. |
+| `src/js/cloud.js` | Guardado en la nube (solo activo en la página publicada de claude.ai). |
 | `tools/sim.js`, `calibrate.js`, `tune.js` | Simulador de economía y calibración. |
 | `design/game-brief.md` | Diseño de una página. |
 
