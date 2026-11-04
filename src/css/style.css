@@ -200,3 +200,120 @@ textarea { width: 100%; background: #120e24; color: var(--text); border: 2px sol
 @media (prefers-reduced-motion: reduce) {
   .float, .ab.ready, .btn.buy.pulse { animation: none; }
 }
+
+/* ======================== Capa de enganche ======================== */
+.resources { flex-wrap: wrap; justify-content: flex-end; gap: 4px 6px; }
+.res { font-size: 13px; padding: 2px 9px; min-width: 52px; }
+#r-dps { position: relative; }
+#dps-delta { position: absolute; right: -2px; top: -15px; font-size: 11px; font-weight: 800; color: var(--good); opacity: 0; pointer-events: none; text-shadow: 0 1px 2px #000; }
+#dps-delta.show { animation: deltaup 1.7s ease-out; }
+@keyframes deltaup { 0% { opacity: 0; transform: translateY(8px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+.chestbtn { cursor: pointer; background: #5a3a12; border-color: var(--gold); color: #fff3d0; }
+.chestbtn:not([hidden]) { animation: readyp 1.4s ease-in-out infinite; }
+#tabs { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 420px) { .brand { display: none; } #topbar { justify-content: flex-end; } }
+
+/* Combo, banner y frenesí sobre el escenario */
+#combo { position: absolute; left: 8px; top: 6px; font-weight: 900; font-size: 15px; color: #fff; pointer-events: none; transform-origin: left top;
+  text-shadow: 0 2px 0 #000, 1px 0 0 #000, -1px 0 0 #000; }
+#combo[hidden], #banner[hidden] { display: none; }
+#combo.hot { color: var(--gold); }
+#combo.pop { animation: combopop .18s ease-out; }
+@keyframes combopop { from { transform: scale(1.5); } to { transform: scale(1); } }
+#banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; font-weight: 900; font-size: 22px; letter-spacing: 1px; color: #fff; pointer-events: none;
+  text-shadow: 0 3px 0 #000, 0 0 16px rgba(255, 205, 117, .9); animation: bannerin 1.9s ease-out forwards; padding: 0 8px; }
+@keyframes bannerin { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; transform: scale(1.18); } 22% { transform: scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
+#banner.boss { color: #ff7a7a; font-size: 26px; text-shadow: 0 3px 0 #000, 0 0 20px rgba(255, 60, 60, .9); }
+#banner.gold { color: var(--gold); }
+#frenzy-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; }
+#stage.frenzy #frenzy-glow { opacity: 1; animation: frenzypulse .5s ease-in-out infinite alternate; }
+@keyframes frenzypulse { from { box-shadow: inset 0 0 30px 6px rgba(255, 120, 30, .7); } to { box-shadow: inset 0 0 50px 14px rgba(255, 60, 20, .95); } }
+#stage.shake { animation: stageshake .18s linear; }
+@keyframes stageshake { 25% { transform: translate(-2px, 1px); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, -1px); } }
+.float.crit { color: #ffb347; font-size: 20px; text-shadow: 0 2px 0 #000, 0 0 10px rgba(255, 140, 30, .9); }
+.float.lvl { color: var(--good); font-size: 14px; }
+.float.heal { color: var(--good); }
+
+/* Barra de frenesí y siguiente meta */
+#fr-row { position: absolute; left: 8px; right: 8px; bottom: 6px; z-index: 3; display: block; height: 20px; padding: 0; border: 2px solid #7a4a1a; border-radius: 6px; background: rgba(27, 16, 32, .82); overflow: hidden; cursor: default; }
+#fr-row[hidden] { display: none; }
+#fr-row .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#ffb347, #e0561a); transition: width .15s; }
+#fr-row .txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; text-shadow: 0 1px 2px #000; }
+#fr-row.ready { cursor: pointer; border-color: var(--gold); animation: readyp .8s ease-in-out infinite; }
+#fr-row.ready .fill { background: linear-gradient(#ffe08a, #ffb347); }
+#fr-row.active .fill { background: linear-gradient(#ff7a3a, #ff3a1a); }
+#goal { margin: 2px 0 4px; padding: 2px 8px; font-size: 11.5px; background: #241c44; border: 2px solid var(--line); border-radius: 6px; }
+#goal[hidden] { display: none; }
+#goal .gbar { height: 4px; background: #120e24; margin-top: 3px; border-radius: 2px; overflow: hidden; }
+#goal .gbar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+#goal.near { border-color: var(--good); }
+#goal.near .gbar i { background: var(--good); }
+
+/* Pestaña Botín */
+.subtabs { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; }
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs .chip { flex: none; min-width: 0; padding: 0 12px; position: relative; white-space: nowrap; }
+.chip .n { margin-left: 5px; background: var(--bad); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; }
+.pbar { height: 8px; background: #120e24; border-radius: 4px; overflow: hidden; margin-top: 5px; border: 1px solid var(--line); }
+.pbar i { display: block; height: 100%; background: linear-gradient(var(--good), #5ea32f); transition: width .3s; }
+.card.questdone { border-color: var(--gold); animation: readyp 1.4s ease-in-out infinite; }
+.daily { background: linear-gradient(#3a2d66, #2a2250); }
+.daily.ready { border-color: var(--gold); }
+.dailystrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 6px; }
+.dailystrip div { text-align: center; font-size: 11px; padding: 4px 0; border: 2px solid var(--line); border-radius: 8px; background: var(--card); line-height: 1.2; }
+.dailystrip div.today { border-color: var(--gold); background: #4a3a12; font-weight: 800; }
+.dailystrip div.past { opacity: .5; }
+.chestrow .ico img { width: 38px; height: 38px; image-rendering: pixelated; }
+.relics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.relic { border: 2px solid var(--rc, #4a3f86); border-radius: 10px; padding: 6px 8px; background: var(--card); font-size: 12px; position: relative; min-height: 84px; }
+.relic .ri { font-size: 24px; line-height: 1.1; }
+.relic .rl { position: absolute; right: 7px; top: 5px; font-weight: 800; color: var(--gold); }
+.relic .rn { font-weight: 700; line-height: 1.15; }
+.relic .rr { color: var(--rc); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.relic .rf { color: #d9d2ff; font-size: 11px; margin-top: 2px; }
+.relic.locked { opacity: .45; }
+.relic.locked .ri { filter: grayscale(1) brightness(.5); }
+.relic.legend { box-shadow: 0 0 10px rgba(255, 205, 117, .45); }
+.beast { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--card); border: 2px solid var(--line); border-radius: 10px; }
+.beast img { width: 38px; height: 38px; flex: none; }
+.beast.unknown img { filter: brightness(0); opacity: .45; }
+.beast .grow { min-width: 0; font-size: 12px; }
+.pips { display: flex; gap: 3px; margin-top: 3px; }
+.pips i { width: 16px; height: 6px; border-radius: 2px; background: #120e24; border: 1px solid var(--line); }
+.pips i.on { background: var(--gold); border-color: #e0a020; }
+.ach.done { opacity: 1; border-color: var(--gold); }
+.perkchips { margin-top: 3px; }
+.perkchips span { display: inline-block; font-size: 11px; background: #2a1d55; border: 1px solid #5a4aa0; padding: 0 7px; border-radius: 999px; margin: 0 4px 3px 0; }
+.btn.perk { background: #4a2a6a; border-color: #b06bff; color: #f0e0ff; animation: readyp 1.2s ease-in-out infinite; }
+.perkopt { display: block; width: 100%; text-align: left; margin-bottom: 8px; }
+.perkopt b { font-size: 15px; display: block; }
+.perkopt small { color: #ffe29a; font-size: 13px; }
+
+/* Revelado de cofres */
+.reveal { text-align: center; }
+.chestimg { width: 104px; height: 104px; image-rendering: pixelated; animation: chestshake .9s ease-in-out; }
+.chestimg.open { animation: chestopen .35s ease-out forwards; }
+@keyframes chestshake { 0%, 100% { transform: translateX(0) rotate(0); } 15% { transform: translateX(-7px) rotate(-7deg); } 30% { transform: translateX(7px) rotate(7deg); } 45% { transform: translateX(-6px) rotate(-6deg); } 60% { transform: translateX(6px) rotate(6deg); } 80% { transform: scale(1.14); } }
+@keyframes chestopen { to { transform: scale(1.5); opacity: 0; } }
+.rewards { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.rw { opacity: 0; transform: translateY(10px) scale(.92); animation: rwin .35s ease-out forwards; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 10px; background: var(--card); border: 2px solid var(--rc, var(--line)); text-align: left; }
+@keyframes rwin { to { opacity: 1; transform: none; } }
+.rw .ri { font-size: 26px; }
+.rw .rt { flex: 1; min-width: 0; }
+.rw .rt small { display: block; color: var(--muted); }
+.rw.legend { box-shadow: 0 0 18px rgba(255, 205, 117, .7); }
+.rw .new { background: var(--good); color: #12300c; border-radius: 6px; font-size: 10px; padding: 1px 6px; font-weight: 800; margin-left: 6px; }
+.rw .big { color: var(--gold); font-weight: 800; }
+.daystrip { margin: 6px 0; }
+@media (prefers-reduced-motion: reduce) {
+  .chestimg, #banner, #stage.shake, #stage.frenzy #frenzy-glow, .chestbtn:not([hidden]), .card.questdone, .btn.perk { animation: none; }
+  .rw { opacity: 1; transform: none; animation: none; }
+}
+
+/* Compactar el combate en móvil */
+.tip { font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 0; }
+.ab { height: 54px; padding: 3px 4px; gap: 3px; }
+.ab img { width: 30px; height: 30px; }
+.ab .abn { font-size: 10.5px; }
+.chestimg.gone { display: none; }
+.rw.pending { opacity: 1; transform: none; animation: none; }

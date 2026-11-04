@@ -47,7 +47,8 @@
     const away = (Date.now() - S.t.saved) / 1000;
     if (away > 60) {
       const rep = GM.offline(S, away);
-      if (rep && (rep.gold > 0 || rep.kills > 0)) GM.UI.offlineReport(rep);
+      if (rep) rep.chest = GM.Loot.welcome(S, away);
+      if (rep && (rep.gold > 0 || rep.kills > 0 || rep.chest)) GM.UI.offlineReport(rep);
     } else if (away > 1) {
       S.evOn = false;
       GM.advance(S, Math.min(away, 60));
@@ -218,7 +219,7 @@
 
     // Guardar al ocultar o cerrar la página: se registra ya, sin esperar a la nube.
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { S.t.saved = Date.now(); save(true); } else if (booted) { catchUp(); loopResume(); }
+      if (document.hidden) { S.t.saved = Date.now(); save(true); GM.Audio.pauseMusic(); } else if (booted) { catchUp(); loopResume(); }
     });
     root.addEventListener('pagehide', () => { S.t.saved = Date.now(); save(true); });
 
@@ -239,6 +240,8 @@
     }
 
     booted = true;
+    GM.Audio.musicOn = S.flags.music !== false;
+    GM.UI.dailyPrompt();
     let last = performance.now(), acc = 0, uiT = 0, saveT = 0, unlockT = 0;
     loopResume = function () { last = performance.now(); };
     function frame(now) {

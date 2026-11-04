@@ -291,6 +291,34 @@
     },
   };
 
+  /** Cofre dibujado con los colores dados. */
+  function chest(c) {
+    const g = Grid();
+    g.rect(2, 9, 12, 5, c.body).ell(8, 8.2, 6, 3.8, c.body);
+    g.rect(2, 12, 12, 1, c.dark).rect(2, 9, 12, 1, c.dark);
+    g.rect(7, 5, 2, 9, c.band);
+    g.rect(7, 9, 2, 3, c.lock).set(8, 10, '0');
+    g.set(4, 6, c.hi).set(5, 5, c.hi).set(10, 5, c.hi);
+    if (c.gem) g.set(4, 11, c.gem).set(11, 11, c.gem);
+    return g;
+  }
+  Object.assign(ENEMY_DRAW, {
+    cofre_bronce() { return chest({ body: '3', dark: '2', band: '4', lock: '4', hi: '4' }); },
+    cofre_plata() { return chest({ body: 'd', dark: 'e', band: 'c', lock: '4', hi: 'c', gem: 'b' }); },
+    cofre_oro() { return chest({ body: '4', dark: '3', band: 'c', lock: '2', hi: 'c', gem: '2' }); },
+    tesorero() {           // Goblin del Tesoro: chaleco dorado y un saco de monedas
+      const g = Grid();
+      g.rect(5, 13, 2, 2, '3').rect(9, 13, 2, 2, '3').rect(6, 10, 3, 3, '3');
+      g.rect(5, 8, 5, 3, '4');
+      g.ell(7, 5, 3.4, 3, '6');
+      g.rect(1, 4, 3, 2, '6').rect(10, 4, 2, 2, '6').set(0, 3, '6');
+      g.set(5, 4, '4').set(8, 4, '4').rect(6, 7, 2, 1, '0');
+      g.ell(12.5, 10.5, 3, 3.2, '3').rect(11, 6, 3, 1, '3').set(12, 5, '4').set(12, 10, '4').set(13, 12, '4');
+      g.pts([[10, 13], [14, 14], [15, 11]], '4');
+      return g;
+    },
+  });
+
   const BOSS_DRAW = {
     b_reylimo() {
       const g = Grid();

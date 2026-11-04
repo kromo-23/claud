@@ -4,8 +4,9 @@ Un **juego incremental de rol con humor** para móvil y PC. Diriges un gremio de
 
 - Equipo de hasta 4 héroes de 6 clases (Guerrero, Maga, Arquero, Clérigo, Ladrona, Bardo) con hitos de poder y habilidades activas. **El de más aggro (el tanque) recibe todos los golpes directos**; el veneno de algunas zonas daña a todos.
 - Una ciudad que mejora con el botín: Herrería, Mercado, Mina, Santuario, Barracones y Biblioteca.
+- **Recompensas por todas partes** (ver `design/engagement.md`): golpes críticos reales, combo de bajas seguidas y **Frenesí** (×2 de daño y ×1,5 de oro); **cofres** de bronce, plata y oro con animación de apertura; **24 reliquias** coleccionables en 4 rarezas que suben de nivel; **misiones** siempre abiertas y **recompensa diaria** de 7 días; **36 especializaciones** de héroe (3 nodos de 2 caminos por héroe); el **Goblin del Tesoro** (evento aleatorio, se atrapa tocándolo); **Bestiario** con hitos, y más de 80 **logros** con cofre. Música distinta en cada zona.
 - 5 zonas con reglas propias (veneno, resistencias, furia...) y jefes con diálogos.
-- 4 **Ascensos de Rango** (prestigio) con estrellas ⭐ y 10 talentos permanentes, 28 logros.
+- 4 **Ascensos de Rango** (prestigio) con estrellas ⭐ y 10 talentos permanentes.
 - Guardado automático, **guardado en la nube** (tu cuenta de claude.ai: sigues en cualquier dispositivo), exportar/importar y **progreso sin conexión** (hasta 8 h).
 - Pixel art dibujado por código, sonido de 8 bits, sin anuncios ni compras.
 
@@ -39,8 +40,8 @@ Publica el juego en GitHub Pages (ver la tabla de arriba) y pasa el enlace. Cual
 ## Desarrollo
 
 ```bash
-npm test            # 27 pruebas del motor (rápidas)
-npm run test:e2e    # 28 pruebas en navegador real (Playwright): nube simulada, compartir partidas, subcarpeta y modo sin conexión
+npm test            # 56 pruebas del motor (rápidas)
+npm run test:e2e    # 40 pruebas en navegador real (Playwright): nube simulada, compartir partidas, subcarpeta, modo sin conexión y la capa de recompensas
 npm run sim         # un jugador automático juega la partida entera y mide su duración
 node tools/calibrate.js --write   # recalibra la dificultad por piso (src/js/floors.js)
 npm run build       # un solo archivo en dist/ para publicar como página
@@ -50,12 +51,14 @@ npm run build       # un solo archivo en dist/ para publicar como página
 |---|---|
 | `src/js/data.js` | Todos los datos y números de equilibrio (héroes, enemigos, talentos, historia...). |
 | `src/js/floors.js` | Tabla de dificultad por piso (la genera `tools/calibrate.js`). |
-| `src/js/core.js` | Motor: combate, compras, ascenso, sin conexión, guardado. Sin DOM, se prueba en Node. |
+| `src/js/core.js` | Motor: combate, críticos, combo, frenesí, compras, ascenso, sin conexión, guardado. Sin DOM, se prueba en Node. |
+| `src/js/data_loot.js`, `loot.js` | Datos y lógica de cofres, reliquias, misiones, recompensa diaria, especializaciones, goblin y bestiario. |
+| `src/js/ui_loot.js` | Pestaña Botín, revelado de cofres, especializaciones, HUD de combo/frenesí/meta. |
 | `src/js/sprites.js`, `scene.js` | Pixel art por código y escena de combate. |
 | `src/js/ui.js`, `main.js` | Interfaz, ventanas, bucle de juego y guardado. |
 | `src/js/cloud.js` | Guardado en la nube (solo activo en la página publicada de claude.ai). |
 | `tools/sim.js`, `calibrate.js`, `tune.js` | Simulador de economía y calibración. |
-| `design/game-brief.md` | Diseño de una página. |
+| `design/game-brief.md`, `design/engagement.md` | Diseño de una página y de la capa de recompensas (con la investigación en que se basa). |
 
 ### Cómo se ajusta la duración
 

@@ -52,6 +52,25 @@
     return bgCache[kind] || (bgCache[kind] = GM.makeBackground(kind, W, H));
   }
 
+  /** Posición del goblin del tesoro: cruza el escenario de derecha a izquierda dando saltitos. */
+  function gobPos(g) {
+    const k = Math.min(1, g.t / g.life);
+    return { x: W + 10 - k * (W + 50), y: FEET - 34 - Math.abs(Math.sin(g.t * 5.5)) * 16 };
+  }
+  /** Caja del goblin (coordenadas lógicas) para detectar toques, o null si no hay. */
+  Scene.goblinBox = function (s) {
+    const g = s.loot && s.loot.gob;
+    if (!g) return null;
+    const p = gobPos(g);
+    return { x: p.x, y: p.y, w: 32, h: 32 };
+  };
+  /** Posición lógica de un héroe del equipo (para mostrar efectos sobre él), o null. */
+  Scene.heroAnchor = function (s, id) {
+    const party = s.party.filter((x) => x && s.heroes[x].lvl > 0);
+    const i = party.indexOf(id);
+    return i < 0 ? null : heroPos(i);
+  };
+
   /** Posición de un héroe según su orden en el equipo (visual). */
   function heroPos(i) { return { x: 104 - i * 27, y: FEET - 32 + (i % 2) * 5 }; }
   const ENEMY_X = 178;
@@ -80,8 +99,9 @@
           if (MELEE[e.id]) h.lunge = 0.18;
           else A.proj.push({ x: p.x + 28, y: p.y + 14, t: 0, c: PROJ_COLOR[e.id] || '#fff', big: !!e.big });
         }
-        A.enemy.hitT = 0.1;
-        if (f && e.v > 0) f(ENEMY_X + (Math.random() * 14 - 7), 60 + Math.random() * 10, GM.fmt(e.v), e.big ? 'big' : '');
+        A.enemy.hitT = e.crit ? 0.16 : 0.1;
+        if (f && e.v > 0) f(ENEMY_X + (Math.random() * 14 - 7), 56 + Math.random() * 10, (e.crit ? '¡' : '') + GM.fmt(e.v) + (e.crit ? '!' : ''), e.crit ? 'crit' : e.big ? 'big' : '');
+        if (e.crit) for (let i = 0; i < 5; i++) A.parts.push({ x: ENEMY_X, y: 80, vx: (Math.random() - 0.5) * 90, vy: -30 - Math.random() * 50, t: 0, life: 0.5, c: '#ffb347', s: 2 });
         break;
       }
       case 'tap':
@@ -89,7 +109,7 @@
         break;
       case 'kill': {
         A.enemy.deadT = 0.35;
-        for (let i = 0; i < (e.boss ? 14 : 6); i++) {
+        for (let i = 0; i < (e.boss ? 14 : 6) + Math.min(10, Math.floor((e.combo || 0) / 4)); i++) {
           A.parts.push({ x: ENEMY_X, y: 88, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 40, t: 0, life: 0.9, c: e.golden ? '#ffcd75' : '#ffcd75', s: 2 });
         }
         if (f) f(ENEMY_X, 52, '+' + GM.fmt(e.gold), 'gold');
@@ -105,6 +125,9 @@
         if (f) f(p.x + 16, p.y - 6, h.ability.name, 'cast');
         break;
       }
+      case 'gobCaught':
+        for (let i = 0; i < 26; i++) A.parts.push({ x: A.lastGob ? A.lastGob.x + 16 : 120, y: A.lastGob ? A.lastGob.y + 12 : 80, vx: (Math.random() - 0.5) * 140, vy: -50 - Math.random() * 70, t: 0, life: 1.1, c: i % 3 ? '#ffcd75' : '#fff6c8', s: 2 });
+        break;
       case 'wipe': A.shake = 0.4; A.flash = 0.5; break;
       case 'bossDown': A.shake = 0.5; break;
       case 'ending': A.flash = 1; break;
@@ -234,6 +257,21 @@
       E.deadT = Math.max(0, E.deadT - dt);
       const size = 16 * E.scale;
       drawSprite(E.sprite, ENEMY_X - size / 2, FEET - size + 2, E.scale, E.tint || 'white', E.deadT / 0.35);
+    }
+
+    // Goblin del tesoro.
+    const gob = s.loot && s.loot.gob;
+    if (gob) {
+      const gp = gobPos(gob);
+      A.lastGob = gp;
+      drawSprite('tesorero', gp.x, gp.y, 2, null, 1, true);
+      bar(gp.x + 4, gp.y - 5, 24, 1 - gob.hits / gob.need, '#ffcd75');
+      if (Math.sin(time * 18) > 0.4) { ctx.fillStyle = '#fff6c8'; ctx.fillRect(Math.round(gp.x + 6 + Math.random() * 20), Math.round(gp.y + 4 + Math.random() * 20), 2, 2); }
+    }
+    // Llamas del frenesí.
+    if (s.fr.t > 0 && Math.random() < 0.5) {
+      const p0 = heroPos(Math.floor(Math.random() * Math.max(1, party.length)));
+      A.parts.push({ x: p0.x + 6 + Math.random() * 20, y: p0.y + 24, vx: (Math.random() - 0.5) * 10, vy: -40 - Math.random() * 30, t: 0, life: 0.6, c: Math.random() < 0.5 ? '#ff7a3a' : '#ffcd75', s: 2 });
     }
 
     // Proyectiles.

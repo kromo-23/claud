@@ -163,8 +163,9 @@ test('habilidades: respetan el enfriamiento y exigen enemigo cuando hace falta',
   s.stats.maxFloor = 10; s.slots = 4;
   GM.buyLevels(s, 'maga', 1); GM.setParty(s, 1, 'maga');
   assert.equal(GM.cast(s, 'maga'), false, 'sin enemigo no hay bola de fuego');
-  GM.advance(s, 3);
+  for (let i = 0; i < 80 && !(s.run.enemy && s.run.enemy.hp > 0); i++) GM.step(s, GM.DT);      // hasta que haya un enemigo vivo
   assert.ok(s.run.enemy, 'ya hay enemigo');
+  s.run.enemy.hp = s.run.enemy.max = 1e9;            // que no muera mientras probamos
   const hp0 = s.run.enemy.hp;
   assert.equal(GM.cast(s, 'maga'), true);
   assert.ok(s.run.enemy.hp < hp0);
@@ -700,4 +701,11 @@ test('misión por tiempo: avanza con los minutos jugados', () => {
   s.loot.quests = [{ id: 'time', goal: 1, p: 0, done: false, reward: 'bronce' }];
   GM.advance(s, 70);
   assert.ok(s.loot.quests[0].done);
+});
+
+test('el reloj del juego (cofres por tiempo) corre también mientras se espera al siguiente enemigo', () => {
+  const s = fresh();
+  s.run.spawnT = 1e9;                                // nunca aparece enemigo: todo el rato es espera
+  GM.advance(s, GM.CFG.timeChestEvery * 2 + 5);
+  assert.ok(GM.Loot.chestTotal(s) >= 2, 'los cofres por tiempo siguen cayendo sin enemigo en pantalla');
 });

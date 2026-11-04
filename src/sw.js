@@ -1,8 +1,8 @@
 /* Service worker: guarda la app para jugar sin conexión. Cambiar VERSION al publicar cambios. */
-const VERSION = 'gremio-v2';
+const VERSION = 'gremio-v3';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/data.js', 'js/floors.js', 'js/util.js', 'js/core.js', 'js/sprites.js', 'js/scene.js', 'js/audio.js', 'js/ui.js', 'js/cloud.js', 'js/main.js',
+  'js/data.js', 'js/data_loot.js', 'js/floors.js', 'js/util.js', 'js/core.js', 'js/loot.js', 'js/sprites.js', 'js/scene.js', 'js/audio.js', 'js/ui.js', 'js/ui_loot.js', 'js/cloud.js', 'js/main.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 self.addEventListener('install', (e) => {

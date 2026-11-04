@@ -19,9 +19,11 @@
     <div class="brand">⚔️ <span>Gremio de Mala Muerte</span></div>
     <div class="resources">
       <div class="res" id="r-gold" title="Oro">🪙 <b>0</b></div>
+      <div class="res" id="r-dps" title="Daño por segundo del equipo">💥 <b>0</b><span id="dps-delta"></span></div>
       <div class="res" id="r-iron" title="Hierro" hidden>⛏️ <b>0</b></div>
       <div class="res" id="r-gem" title="Cristales" hidden>💎 <b>0</b></div>
       <div class="res" id="r-star" title="Estrellas" hidden>⭐ <b>0</b></div>
+      <button class="res chestbtn" id="r-chest" title="Cofres sin abrir" hidden>🎁 <b>0</b></button>
     </div>
   </header>
 
@@ -30,10 +32,15 @@
       <div id="stage">
         <canvas id="cv" width="512" height="288" aria-label="Escena de combate: toca al enemigo para golpearlo"></canvas>
         <div id="fx"></div>
+        <div id="combo" hidden></div>
+        <div id="banner" hidden></div>
+        <div id="frenzy-glow"></div>
+        <button id="fr-row" type="button" aria-label="Frenesí"><div class="fill"></div><span class="txt"></span></button>
       </div>
       <div id="info">
         <div class="line1"><b id="zone-name"></b><span id="rank-label"></span><span id="floor-label"></span></div>
         <div id="enemy-bar"><div class="fill"></div><span class="txt"></span></div>
+        <div id="goal" hidden><span class="gtxt"></span><div class="gbar"><i></i></div></div>
         <div class="line3">
           <div id="kill-dots" aria-hidden="true"></div>
           <div id="controls">
@@ -54,6 +61,7 @@
       <nav id="tabs" aria-label="Secciones">
         <button data-tab="heroes" class="on"><span>🛡️</span>Héroes</button>
         <button data-tab="city"><span>🏘️</span>Ciudad</button>
+        <button data-tab="loot"><span>🎁</span>Botín</button>
         <button data-tab="ascend"><span>⭐</span>Ascenso</button>
         <button data-tab="more"><span>☰</span>Más</button>
       </nav>
@@ -64,13 +72,16 @@
 <div id="modal-root"></div>
 
 <script src="js/data.js"></script>
+<script src="js/data_loot.js"></script>
 <script src="js/floors.js"></script>
 <script src="js/util.js"></script>
 <script src="js/core.js"></script>
+<script src="js/loot.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/scene.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/ui_loot.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/main.js"></script>
 </body>

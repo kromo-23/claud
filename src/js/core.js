@@ -76,7 +76,7 @@
       cmb: { n: 0, t: 0 },       // combo de bajas seguidas
       loot: GM.Loot ? GM.Loot.fresh() : {},
       kills: {},               // derrotas por tipo de enemigo (bestiario)
-      flags: { autoCast: true, auto: true, speed: 1, ending: false, endless: false, story: {}, zoneBoss: {}, muted: false, vol: 0.5, buyN: 1 },
+      flags: { autoCast: true, auto: true, speed: 1, ending: false, endless: false, story: {}, zoneBoss: {}, muted: false, music: true, vol: 0.5, buyN: 1 },
       t: { played: 0, saved: now, created: now },
       ev: [],
       evOn: false,
@@ -528,6 +528,7 @@
       else if (autoOn && !hs.down && autoCastOk(s, id)) GM.cast(s, id);
     }
     if (D.miningRate > 0) s.res.iron += D.miningRate * D.ironMult * dt;
+    emit(s, 'tick', dt);       // reloj general (cofres por tiempo, misiones de tiempo, goblin): corre también entre enemigos
 
     if (!r.enemy) {
       r.spawnT -= dt;
@@ -593,7 +594,6 @@
     // Logros y automatización periódica.
     s._achT += dt;
     if (s._achT >= 2) { s._achT = 0; GM.checkAchievements(s); }
-    emit(s, 'tick', dt);
   };
 
   /**
@@ -863,6 +863,8 @@
       default: return s.stats[key] || 0;
     }
   }
+  /** Valor actual de la estadística de un logro (para mostrar el progreso). */
+  GM.statValue = statValue;
   /** Comprueba los logros y concede los nuevos. @returns {string[]} ids nuevos. */
   GM.checkAchievements = function (s) {
     const got = [];

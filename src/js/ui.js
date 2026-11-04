@@ -17,6 +17,8 @@
     return iconCache[name] || (iconCache[name] = GM.spriteCanvas(name).toDataURL());
   }
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Utilidades compartidas con ui_loot.js.
+  UI.get = () => S; UI.portrait = portrait; UI.esc = esc; UI.$ = $; UI.$$ = $$;
 
   /* ------------------------------------------------------------ sincronizar filas */
 
@@ -117,6 +119,15 @@
     GM.Audio.play('click');
   }
 
+  /** Cierra la ventana abierta resolviendo su promesa con `value`. */
+  UI.closeModal = function (value) {
+    if (!modalOpen) return;
+    const it = modalOpen;
+    if (it.o.onClose) it.o.onClose(value, $('#modal-root .modal'));
+    it.resolve(value);
+    nextModal();
+  };
+
   /** Muestra una página de historia. */
   UI.story = function (title, text, opts) {
     return UI.modal({ title: `<span class="story-t">${title}</span>`, html: `<p class="story">${text}</p>`,
@@ -151,17 +162,20 @@
     $('#stage').addEventListener('pointerdown', (e) => {
       GM.Audio.unlock();
       if (UI.paused) return;
+      if (e.target.closest && e.target.closest('#fr-row')) return;     // la barra de frenesí tiene su propio botón
+      const r = $('#stage').getBoundingClientRect();
+      const lx = ((e.clientX - r.left) / r.width) * GM.Scene.size.w, ly = ((e.clientY - r.top) / r.height) * GM.Scene.size.h;
+      if (UI.goblinTap && UI.goblinTap(lx, ly)) return;
       const dmg = GM.tap(S);
       if (dmg > 0) {
         GM.Audio.play('tap');
-        const r = $('#stage').getBoundingClientRect();
-        const lx = ((e.clientX - r.left) / r.width) * GM.Scene.size.w, ly = ((e.clientY - r.top) / r.height) * GM.Scene.size.h;
         UI.float(lx, ly - 6, fmt(dmg), 'tap');
       }
     });
     document.addEventListener('pointerdown', () => GM.Audio.unlock(), { once: true });
     root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); UI.installPrompt = e; });
     root.addEventListener('appinstalled', () => { UI.installPrompt = null; UI.toast('📲 ¡App instalada!', 'good'); });
+    if (UI.initLoot) UI.initLoot();
     UI.setTab(UI.tab);
     UI.refresh(true);
   };
@@ -219,10 +233,16 @@
     if (!b) return;
     GM.Audio.unlock();
     const act = b.dataset.act, id = b.dataset.id, i = Number(b.dataset.i);
-    let ok = true, sound = 'buy';
-    switch (act) {
+    let ok = true, sound = 'buy', handledByLoot = false;
+    if (UI.lootAction && UI.lootAction(act, b.dataset)) handledByLoot = true;
+    else switch (act) {
       case 'buyn': S.flags.buyN = b.dataset.n === 'max' ? 'max' : Number(b.dataset.n); sound = 'click'; break;
-      case 'lvl': ok = GM.buyLevels(S, id, S.flags.buyN) > 0; break;
+      case 'lvl': {
+        const before = S.heroes[id].lvl;
+        ok = GM.buyLevels(S, id, S.flags.buyN) > 0;
+        if (ok && UI.levelFx) { UI.levelFx(id, before, S.heroes[id].lvl); sound = null; }
+        break;
+      }
       case 'hire': ok = GM.buyLevels(S, id, 1) > 0; if (ok) { sound = 'unlock'; UI.toast(`<b>${GM.HERO_BY_ID[id].name}</b> se une al gremio. ${GM.HERO_BY_ID[id].quote}`, 'good'); } break;
       case 'party': pickSlot(id); sound = 'click'; break;
       case 'slot': pickHeroForSlot(i); sound = 'click'; break;
@@ -238,11 +258,13 @@
       case 'savenow': host.save(true); UI.toast('Partida guardada.', 'good'); sound = 'click'; break;
       case 'wipe': resetGame(); sound = 'click'; break;
       case 'cloud': host.cloud(id); sound = 'click'; break;
+      case 'music': S.flags.music = S.flags.music === false; GM.Audio.musicOn = S.flags.music !== false; if (!GM.Audio.musicOn) GM.Audio.pauseMusic(); sound = 'click'; break;
       case 'share': shareGame(); sound = 'click'; break;
       case 'install': installApp(); sound = 'click'; break;
       default: sound = 'click';
     }
-    GM.Audio.play(ok ? sound : 'deny');
+    if (handledByLoot) sound = null;
+    if (sound || !ok) GM.Audio.play(ok ? sound : 'deny');
     if (act === 'lvl' && ok) S.flags.hintDone = true;
     GM.checkAchievements(S);
     UI.refresh(true);
@@ -470,8 +492,8 @@
         <div class="title"><b>${h.name}</b> <span class="tag">${h.cls} · ${h.role}</span> <span class="lvl">Nv ${hs.lvl}</span></div>
         <div class="stats"><span>${type}</span><span>💥 ${fmt(d.dps * D.aura)}/s</span><span>❤️ ${fmt(d.hpMax)}</span>${h.heal ? `<span>💚 ${fmt(d.hps)}/s</span>` : ''}</div>
         <div class="ability">✨ <b>${h.ability.name}</b>: ${h.ability.desc}</div>
-        <div class="mile">${ms ? `Hito en nivel ${ms}: ×${GM.CFG.msMult} poder` : 'Todos los hitos conseguidos'}</div></div>
-        <div class="actions">${btn('lvl', `data-id="${h.id}"`, label + '<br>' + costLabel(c), can)}
+        <div class="mile">${ms ? `Hito en nivel ${ms}: ×${GM.CFG.msMult} poder` : 'Todos los hitos conseguidos'}</div>${UI.perkChips ? UI.perkChips(h.id) : ''}</div>
+        <div class="actions">${btn('lvl', `data-id="${h.id}"`, label + '<br>' + costLabel(c), can)}${UI.perkBtn ? UI.perkBtn(h.id) : ''}
         <button class="btn small" data-act="party" data-id="${h.id}">${inP ? 'Quitar' : 'Equipar'}</button></div>` });
     });
     return rows;
@@ -590,6 +612,7 @@
     rows.push({ key: 'h-set', cls: 'sect', html: '⚙️ <b>Ajustes</b>' });
     rows.push({ key: 'sound', cls: 'card', html: `<div class="ico">${S.flags.muted ? '🔇' : '🔊'}</div><div class="grow"><b>Sonido</b><div class="vol"><input type="range" min="0" max="100" value="${Math.round(S.flags.vol * 100)}" id="vol" aria-label="Volumen"></div></div>
       <div class="actions"><button class="btn small" data-act="mute">${S.flags.muted ? 'Activar' : 'Silenciar'}</button></div>` });
+    rows.push({ key: 'music', cls: 'card', html: `<div class="ico">🎵</div><div class="grow"><b>Música</b><div class="muted">Una melodía distinta para cada zona.</div></div><div class="actions"><button class="btn small" data-act="music">${S.flags.music === false ? 'Activar' : 'Silenciar'}</button></div>` });
     rows.push({ key: 'save', cls: 'card', html: `<div class="ico">💾</div><div class="grow"><b>Partida</b><div class="muted">Se guarda sola cada pocos segundos en este navegador.</div></div>
       <div class="actions"><button class="btn small" data-act="savenow">Guardar</button><button class="btn small" data-act="export">Exportar</button><button class="btn small" data-act="import">Importar</button></div>` });
     rows.push(cloudRow());
@@ -604,9 +627,6 @@
       ['Derrotas del equipo', fmt(st.wipes)], ['Oro total', fmt(st.goldTotal)],
     ];
     rows.push({ key: 'stats', cls: 'statgrid', html: lines.map((l) => `<div><span>${l[0]}</span><b>${l[1]}</b></div>`).join('') });
-    const n = Object.keys(S.ach).length;
-    rows.push({ key: 'h-ach', cls: 'sect', html: `🏆 <b>Logros</b> <small>${n}/${GM.ACHIEVEMENTS.length} — cada uno da +2% de daño y oro</small>` });
-    rows.push({ key: 'ach', cls: 'achgrid', html: GM.ACHIEVEMENTS.map((a) => `<div class="ach ${S.ach[a.id] ? 'on' : ''}">${S.ach[a.id] ? '🏆' : '🔒'} ${a.name}</div>`).join('') });
     rows.push({ key: 'h-danger', cls: 'sect', html: '☠️ <b>Zona peligrosa</b>' });
     rows.push({ key: 'wipe', cls: 'card', html: '<div class="grow"><b>Empezar de cero</b><div class="muted">Borra la partida guardada.</div></div><div class="actions"><button class="btn small danger" data-act="wipe">Borrar</button></div>' });
     rows.push({ key: 'credits', cls: 'credits', html: 'Gremio de Mala Muerte · hecho con Claude Code<br>Pixel art generado por código · sin anuncios ni compras' });
@@ -630,7 +650,7 @@
     for (const r of GM.RESEARCH) if (!S.research[r.id] && S.stats.maxFloor >= r.unlock && S.res.crystals >= r.cost) city = true;
     let asc = GM.canAscend(S);
     for (const t of GM.TALENTS) { const c = GM.talentCost(S, t.id); if (c !== null && S.res.stars >= c) asc = true; }
-    return { heroes: heroes, city: city, ascend: asc };
+    return { heroes: heroes, city: city, ascend: asc, loot: UI.lootDot ? UI.lootDot() : false };
   }
 
   /**
@@ -695,8 +715,10 @@
     }
     // Panel activo.
     const body = $('#tab-body');
-    const rows = UI.tab === 'heroes' ? heroRows() : UI.tab === 'city' ? cityRows() : UI.tab === 'ascend' ? ascendRows() : moreRows();
+    const rows = UI.tab === 'heroes' ? heroRows() : UI.tab === 'city' ? cityRows() : UI.tab === 'ascend' ? ascendRows()
+      : UI.tab === 'loot' && UI.lootRows ? UI.lootRows() : moreRows();
     sync(body, rows);
+    if (UI.refreshHud) UI.refreshHud();
     const vol = $('#vol');
     if (vol && !vol._b) { vol._b = true; vol.addEventListener('input', () => { S.flags.vol = vol.value / 100; GM.Audio.set(S.flags.muted, S.flags.vol); }); }
   };
@@ -710,22 +732,22 @@
     for (const e of evs) {
       GM.Scene.event(S, e);
       switch (e.t) {
-        case 'hit': GM.Audio.play(e.big ? 'cast' : 'hit'); break;
-        case 'kill': GM.Audio.play(e.boss ? 'boss' : 'coin'); break;
+        case 'hit': if (e.crit) { GM.Audio.play('crit'); if (UI.shake) UI.shake(); } else GM.Audio.play(e.big ? 'cast' : 'hit'); break;
+        case 'kill': GM.Audio.play(e.boss ? 'boss' : 'coin'); if (e.combo) GM.Audio.combo(e.combo); break;
         case 'cast': GM.Audio.play('cast'); break;
         case 'down': GM.Audio.play('down'); break;
         case 'wipe': GM.Audio.play('wipe'); UI.toast('💀 El equipo ha caído y retrocede un piso para reforzarse.', 'warn', 'wipe'); break;
         case 'ach': {
           const a = GM.ACHIEVEMENTS.find((x) => x.id === e.id);
           GM.Audio.play('ach');
-          UI.toast(`🏆 <b>${a.name}</b><br><small>+2% de daño y oro</small>`, 'good');
+          UI.toast(`🏆 <b>${a.name}</b><br><small>+${GM.CFG.ach * 100}% de daño y oro · +1 cofre ${a.reward === 'oro' ? 'de oro' : a.reward === 'plata' ? 'de plata' : 'de bronce'}</small>`, 'good');
           break;
         }
         case 'spawn': onSpawn(e.enemy); break;
         case 'bossDown': onBossDown(e); break;
         case 'ascend': onAscend(e); break;
         case 'ending': onEnding(); break;
-        default:
+        default: if (UI.lootEvent) UI.lootEvent(e);
       }
     }
   };
@@ -737,6 +759,7 @@
       fl['z' + zi] = true;
       UI.story(GM.ZONES[zi].name, GM.ZONES[zi].intro, { btn: zi === 0 ? '¡A la mazmorra!' : 'Adelante' });
     }
+    if (en.boss >= 2 && UI.banner) UI.banner('⚔️ ¡' + en.name + '!', 'boss');
     if (en.boss >= 2 && !fl['b' + zi]) {
       fl['b' + zi] = true;
       GM.Audio.play('boss');
@@ -768,7 +791,7 @@
   /** Informe de lo ocurrido mientras el jugador estaba fuera. */
   UI.offlineReport = function (rep) {
     return UI.modal({ title: '🌙 Mientras no estabas...', wide: true,
-      html: `<p>Estuviste fuera <b>${GM.fmtTime(rep.away)}</b>${rep.capped ? ' (el tope de progreso es ' + GM.fmtTime(GM.D(S).offCapS) + ')' : ''}. Tu equipo siguió luchando a un ${Math.round(rep.eff * 100)}% de eficiencia:</p>
+      html: `${rep.chest ? '<p class="good">🎁 <b>Cofre de bienvenida</b> (' + (rep.chest === 'plata' ? 'plata' : 'bronce') + ') esperándote en Botín.</p>' : ''}<p>Estuviste fuera <b>${GM.fmtTime(rep.away)}</b>${rep.capped ? ' (el tope de progreso es ' + GM.fmtTime(GM.D(S).offCapS) + ')' : ''}. Tu equipo siguió luchando a un ${Math.round(rep.eff * 100)}% de eficiencia:</p>
         <div class="statgrid"><div><span>🪙 Oro</span><b>+${fmt(rep.gold)}</b></div><div><span>⛏️ Hierro</span><b>+${fmt(rep.iron)}</b></div>
         <div><span>💎 Cristales</span><b>+${fmt(rep.crystals)}</b></div><div><span>⚔️ Enemigos</span><b>${fmt(rep.kills)}</b></div>
         ${rep.floors > 0 ? `<div><span>🏔️ Pisos nuevos</span><b>+${rep.floors}</b></div>` : ''}</div>`,
@@ -779,6 +802,7 @@
   UI.checkUnlocks = function () {
     const seen = S.flags.seen || (S.flags.seen = {});
     const mf = S.stats.maxFloor;
+    if (UI.dailyPrompt && !UI.paused) UI.dailyPrompt();
     GM.HEROES.forEach((h) => { if (h.hireFloor > 1 && mf >= h.hireFloor && !seen['h' + h.id]) { seen['h' + h.id] = true; GM.Audio.play('unlock'); UI.toast(`🍺 <b>${h.name}</b> (${h.cls}) está en la Taberna.`, 'info'); } });
     GM.BUILDINGS.forEach((b) => { if (b.unlock > 1 && mf >= b.unlock && !seen['b' + b.id]) { seen['b' + b.id] = true; GM.Audio.play('unlock'); UI.toast(`🏗️ Nuevo edificio: <b>${b.name}</b>.`, 'info'); } });
     if (mf >= 3 && !seen.saveHint && !GM.Cloud.available() && GM.Cloud.status !== 'connecting') {
