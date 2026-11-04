@@ -14,7 +14,7 @@
 'use strict';
 const path = require('path');
 const src = path.join(__dirname, '..', 'src', 'js');
-['data.js', 'floors.js', 'util.js', 'core.js'].forEach((f) => require(path.join(src, f)));
+require('./engine-files.js').forEach((f) => require(path.join(src, f)));
 const GM = globalThis.GM;
 
 const BASE_CFG = JSON.parse(JSON.stringify(GM.CFG));
@@ -39,7 +39,7 @@ function power(s, zoneIdx) {
 }
 
 const TALENT_W = { fuerza: 3, oro: 2.5, vida: 1.5, veteranos: 2, herencia: 0.6, regateo: 1, ritmo: 0.6, hierro: 0.8, toque: 0.1, sueno: 0.1 };
-const RESEARCH_ORDER = ['autocast', 'tap', 'contable', 'cofres', 'horas', 'bestiario', 'turbo2', 'turbo3'];
+const RESEARCH_ORDER = ['autocast', 'berserker', 'tap', 'contable', 'cofres', 'horas', 'turbo2', 'turbo3'];
 
 function chooseParty(s) {
   const zi = GM.zoneIndex(s.run.floor);
@@ -68,8 +68,29 @@ function chooseParty(s) {
   }
 }
 
+/** Elige en cada especialización disponible la opción que más sube la fuerza del equipo. */
+function pickPerks(s, zi) {
+  const l = GM.Loot.of(s);
+  for (const a of GM.Loot.perkAvailable(s)) {
+    let best = 0, bestP = -1;
+    if (!l.perks[a.id]) l.perks[a.id] = [null, null, null];
+    for (const idx of [0, 1]) {
+      l.perks[a.id][a.node] = idx; GM.dirty(s);
+      const p = power(s, zi);
+      if (p > bestP) { bestP = p; best = idx; }
+    }
+    l.perks[a.id][a.node] = null; GM.dirty(s);
+    GM.Loot.choosePerk(s, a.id, a.node, best);
+  }
+}
+
 function act(s) {
   const r = s.run;
+  // Botín: abrir cofres, reclamar misiones, elegir especializaciones y usar el frenesí.
+  GM.Loot.openAll(s);
+  GM.Loot.claimAll(s);
+  GM.startFrenzy(s);
+  pickPerks(s, GM.zoneIndex(r.floor));
   // Contratar y ampliar equipo.
   for (const h of GM.HEROES) {
     if (GM.canHire(s, h.id) && s.res.gold >= h.hireCost) GM.buyLevels(s, h.id, 1);
@@ -193,7 +214,7 @@ function simulate(ov, opt) {
       const dur = t - rankStart[rk];
       durations.push(dur);
       if (opt.stopAt === rk) stop = true;
-      log.push(`ASCENSO ${rk} -> ${rk + 1} a las ${fmtT(t)} (recorrido de ${fmtT(dur)}, +${stars} estrellas, wipes ${s.run.wipes}, oro total ${GM.fmt(s.run.goldEarned)})`);
+      log.push(`ASCENSO ${rk} -> ${rk + 1} a las ${fmtT(t)} (recorrido de ${fmtT(dur)}, +${stars} estrellas, wipes ${s.run.wipes}, oro total ${GM.fmt(s.run.goldEarned)}) | cofres ${s.stats.chests}, reliquias ${s.stats.relics}/24 (niveles ${Object.keys(s.loot.relics).reduce((a, k) => a + s.loot.relics[k], 0)}/286), espec. ${s.stats.perks}, logros ${Object.keys(s.ach).length}`);
       GM.ascend(s);
       spendStars(s);
       rankStart.push(t);
@@ -210,6 +231,7 @@ function simulate(ov, opt) {
   out.push(`Niveles finales: ${levels} | equipo: ${s.party.filter(Boolean).join(',')}`);
   out.push(`Equipo forja: ${s.gear.join('/')}  talentos: ${JSON.stringify(s.talents)}`);
   out.push(`Cristales: ${s.res.crystals}, investigaciones: ${Object.keys(s.research).join(',')}`);
+  out.push(`Botín: ${s.stats.chests} cofres, ${s.stats.relics}/24 reliquias (${s.stats.legendary} legendarias), ${s.stats.quests} misiones, ${s.stats.perks} especializaciones, ${s.stats.crits} críticos, ${s.stats.frenzies} frenesíes, ${Object.keys(s.ach).length} logros`);
   out.push(s.flags.ending
     ? `FINAL alcanzado a las ${fmtT(t)} (${(t / 3600).toFixed(2)} h) — piso ${s.run.floor}, rango ${s.run.rank}`
     : `NO se llegó al final en ${maxHours} h — piso ${s.run.floor}, rango ${s.run.rank}, canAscend=${s.run.canAscend}`);

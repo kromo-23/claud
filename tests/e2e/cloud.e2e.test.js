@@ -9,7 +9,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const ROOT = path.join(__dirname, '..', '..', 'src');
-['data.js', 'floors.js', 'util.js', 'core.js'].forEach((f) => require(path.join(ROOT, 'js', f)));
+require('../../tools/engine-files.js').forEach((f) => require(path.join(ROOT, 'js', f)));
 const GM = globalThis.GM;
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };

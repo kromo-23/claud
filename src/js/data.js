@@ -211,8 +211,8 @@
       desc: 'El progreso sin conexión dura 4 horas más.' },
     { id: 'turbo3', name: 'Cafeína Intravenosa', icon: '⚡', cost: 15, unlock: 40,
       desc: 'Desbloquea la velocidad ×3.' },
-    { id: 'bestiario', name: 'Bestiario Ilustrado', icon: '📚', cost: 12, unlock: 40,
-      desc: '+1% de daño por cada tipo de enemigo derrotado 100 veces.' },
+    { id: 'berserker', name: 'Instinto Berserker', icon: '😤', cost: 6, unlock: 20,
+      desc: 'El frenesí se activa solo en cuanto se llena la barra.' },
   ];
 
   /** Talentos (se compran con estrellas ⭐). max niveles; coste = 1 + floor(nivel/2) * step. */

@@ -26,7 +26,7 @@ function table() {
 }
 
 for (let z = 0; z < 5; z++) {
-  let lo = 0.02, hi = 1.2, bestStep = steps[z], bestErr = Infinity;
+  let lo = 0.02, hi = 3.0, bestStep = steps[z], bestErr = Infinity;
   for (let it = 0; it < 16; it++) {
     const mid = it === 0 ? steps[z] : Math.sqrt(lo * hi);
     steps[z] = mid;

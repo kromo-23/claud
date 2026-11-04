@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 
 const src = path.join(__dirname, '..', 'src', 'js');
-['data.js', 'floors.js', 'util.js', 'core.js'].forEach((f) => require(path.join(src, f)));
+require('../tools/engine-files.js').forEach((f) => require(path.join(src, f)));
 const GM = globalThis.GM;
 
 function fresh() {
@@ -392,4 +392,312 @@ test('el escudo reduce el daño directo que recibe el tanque', () => {
   b.fx.shieldT = 8; b.fx.shieldV = 0.6;
   GM.step(a, 1); GM.step(b, 1);
   assert.ok(1 - b.heroes.guerrero.hpf < (1 - a.heroes.guerrero.hpf) * 0.5);
+});
+
+/* ===================== Capa de enganche: críticos, combo, frenesí ===================== */
+
+/** Ejecuta `fn` con una probabilidad de crítico fija (configuración real, no valores cacheados). */
+function withCrit(chance, fn) {
+  const base = GM.CFG.critBase, cap = GM.CFG.critCap;
+  GM.CFG.critBase = chance; GM.CFG.critCap = 1;
+  try { return fn(); } finally { GM.CFG.critBase = base; GM.CFG.critCap = cap; }
+}
+const dummy = () => ({ hp: 1e30, max: 1e30, dmg: 0, phys: 1, magic: 1, t: 0, gold: 0, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false });
+
+/** Cuenta los golpes (y cuántos son críticos) durante unos segundos. */
+function critCount(chance, seed) {
+  return withCrit(chance, () => {
+    GM.rand = GM.seeded(seed);
+    const s = GM.newState(); s.evOn = true;
+    s.heroes.guerrero.lvl = 50; GM.dirty(s);
+    s.run.enemy = dummy();
+    let hits = 0, crits = 0;
+    for (let i = 0; i < 240; i++) {
+      GM.step(s, GM.DT);
+      for (const e of s.ev.splice(0)) if (e.t === 'hit') { hits++; if (e.crit) crits++; }
+    }
+    return { hits, crits, stat: s.stats.crits };
+  });
+}
+
+test('críticos: con probabilidad 0 nunca hay y con 1 siempre, y cuentan en las estadísticas', () => {
+  const none = critCount(0, 1), all = critCount(1, 1);
+  assert.ok(none.hits > 20 && none.crits === 0 && none.stat === 0);
+  assert.ok(all.hits > 20 && all.crits === all.hits && all.stat === all.hits);
+});
+
+test('un golpe crítico hace daño extra real, no solo un número más grande', () => {
+  const dealt = (chance) => withCrit(chance, () => {
+    GM.rand = GM.seeded(3);
+    const s = GM.newState(); s.heroes.guerrero.lvl = 50; GM.dirty(s);
+    s.run.enemy = dummy(); s.run.enemy.hp = s.run.enemy.max = 1e12;
+    for (let i = 0; i < 40; i++) GM.step(s, GM.DT);
+    return 1e12 - s.run.enemy.hp;
+  });
+  assert.ok(dealt(1) > dealt(0) * 2, 'con críticos siempre se hace ~2,5× más daño');
+});
+
+test('combo: las bajas seguidas lo suben, un hueco largo lo rompe y da más oro', () => {
+  const s = fresh();
+  const fakeKill = () => {
+    s.run.enemy = { hp: 0, max: 1, dmg: 0, phys: 1, magic: 1, t: 0, gold: 100, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+    s.run.kills = 0;
+    const g0 = s.res.gold; GM.step(s, GM.DT); return s.res.gold - g0;
+  };
+  s.run.floor = 3;
+  const first = fakeKill();
+  for (let i = 0; i < 9; i++) s.run.spawnT = 0, fakeKill();
+  assert.ok(s.cmb.n >= 9, 'el combo sube');
+  const tenth = fakeKill();
+  assert.ok(tenth > first, 'cada baja seguida da más oro');
+  for (let i = 0; i < 40; i++) { s.run.enemy = null; s.run.spawnT = 99; GM.step(s, GM.DT); }     // 10 s sin bajas
+  assert.equal(s.cmb.n, 0, 'el combo se rompe tras la ventana');
+  assert.ok(s.stats.combo >= 10, 'y se recuerda el máximo');
+});
+
+test('frenesí: se carga matando, se activa lleno, dura y multiplica daño y oro', () => {
+  const s = fresh();
+  assert.equal(GM.startFrenzy(s), false, 'sin barra llena no se activa');
+  s.fr.m = GM.CFG.frenzyNeed;
+  const dps0 = GM.partyDps(s);
+  assert.equal(GM.startFrenzy(s), true);
+  assert.equal(s.fr.m, 0);
+  assert.ok(Math.abs(GM.partyDps(s) / dps0 - GM.CFG.frenzyDmg) < 1e-9, 'el daño se multiplica');
+  assert.equal(GM.startFrenzy(s), false, 'no se puede activar dos veces');
+  for (let i = 0; i < GM.CFG.frenzyDur / GM.DT + 4; i++) { s.run.enemy = null; s.run.spawnT = 99; GM.step(s, GM.DT); }
+  assert.equal(s.fr.t, 0, 'termina');
+  assert.equal(s.stats.frenzies, 1);
+});
+
+test('frenesí: la investigación Instinto Berserker lo activa sola al llenarse', () => {
+  const s = fresh();
+  s.research.berserker = true;
+  s.fr.m = GM.CFG.frenzyNeed - 1;
+  s.run.enemy = { hp: 0, max: 1, dmg: 0, phys: 1, magic: 1, t: 0, gold: 1, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  GM.step(s, GM.DT);
+  assert.ok(s.fr.t > 0, 'se activó sin pulsar nada');
+});
+
+/* ===================== Botín: cofres y reliquias ===================== */
+
+test('abrir un cofre consume uno, da oro y puede dar reliquias; sin cofres no pasa nada', () => {
+  const s = fresh();
+  assert.equal(GM.Loot.open(s, 'bronce'), null);
+  GM.Loot.addChest(s, 'oro', 2);
+  const g0 = s.res.gold;
+  const r = GM.Loot.open(s, 'oro');
+  assert.ok(r.gold > 0 && s.res.gold > g0);
+  assert.equal(r.relics.length, GM.CHESTS.oro.rolls);
+  assert.equal(s.loot.chests.oro, 1);
+  assert.equal(s.stats.chests, 1);
+});
+
+test('las reliquias suben de nivel con los repetidos y al máximo se convierten en cristales', () => {
+  const s = fresh();
+  const rel = GM.RELICS.find((r) => r.id === 'cuchillo');          // común: máx 15
+  const first = GM.Loot.grantRelic(s, rel);
+  assert.equal(first.isNew, true); assert.equal(first.level, 1);
+  const dmg1 = GM.D(s).dmgMult;
+  for (let i = 0; i < 20; i++) GM.Loot.grantRelic(s, rel);
+  assert.equal(s.loot.relics.cuchillo, GM.RELIC_MAX[0], 'tope de nivel');
+  assert.ok(GM.D(s).dmgMult > dmg1, 'más nivel, más daño');
+  assert.ok(s.res.crystals >= 5, 'los sobrantes dan cristales');
+  assert.equal(s.stats.relicsMaxed, 1);
+});
+
+test('pity: tras muchas tiradas sin legendaria se garantiza una', () => {
+  const s = fresh(); GM.rand = GM.seeded(11);
+  s.loot.pity = GM.CFG.pityLegend - 1;
+  GM.Loot.addChest(s, 'bronce', 1);
+  const r = GM.Loot.open(s, 'bronce');
+  assert.equal(r.relics[0].rar, 3);
+  assert.equal(s.loot.pity, 0);
+});
+
+test('el bonus de colección: cada 6 reliquias distintas dan un extra', () => {
+  const s = fresh();
+  const base = GM.D(s).dmgMult;
+  GM.RELICS.slice(0, 6).forEach((r) => { s.loot.relics[r.id] = 0; });
+  const noSet = (() => { GM.RELICS.slice(0, 5).forEach((r) => { s.loot.relics[r.id] = 1; }); GM.dirty(s); return GM.D(s).goldMult; })();
+  s.loot.relics[GM.RELICS[5].id] = 1; GM.dirty(s);
+  assert.ok(GM.D(s).goldMult > noSet * 1.04, 'al llegar a 6 distintas se activa el set');
+  assert.ok(base > 0);
+});
+
+test('jefes y minijefes sueltan cofres; el jefe de zona solo una vez por recorrido y piso', () => {
+  const s = fresh(); GM.rand = GM.seeded(2);
+  s.run.floor = 20; s.stats.maxFloor = 20;
+  const boss = () => { s.run.enemy = { hp: 0, max: 1, dmg: 0, phys: 1, magic: 1, t: 0, gold: 1, iron: 0, type: 'boss0', name: 'Rey', sprite: 'b_reylimo', boss: 2, golden: false }; s.run.kills = 4; GM.step(s, GM.DT); };
+  boss(); boss(); boss();
+  assert.equal(s.loot.chests.oro, 1, 'farmear el mismo jefe no regala cofres de oro sin parar');
+  s.stats.ascents = 1; boss();
+  assert.equal(s.loot.chests.oro, 2, 'en otro recorrido vuelve a dar');
+});
+
+/* ===================== Especializaciones ===================== */
+
+test('especializaciones: se abren por nivel, se eligen una vez, dan efecto y se reasignan con cristales', () => {
+  const s = fresh();
+  assert.equal(GM.Loot.choosePerk(s, 'guerrero', 0, 0), false, 'bloqueada hasta el nivel 20');
+  s.heroes.guerrero.lvl = 20; GM.dirty(s);
+  const before = GM.D(s).hero.guerrero.dps;
+  assert.deepEqual(GM.Loot.perkAvailable(s), [{ id: 'guerrero', node: 0 }]);
+  assert.equal(GM.Loot.choosePerk(s, 'guerrero', 0, 1), true);              // Espada Afilada: +50% daño
+  assert.ok(Math.abs(GM.D(s).hero.guerrero.dps / before - 1.5) < 1e-9);
+  assert.equal(GM.Loot.choosePerk(s, 'guerrero', 0, 0), false, 'no se puede cambiar sin reasignar');
+  assert.equal(GM.Loot.choosePerk(s, 'guerrero', 5, 0), false);
+  assert.equal(GM.Loot.respec(s, 'guerrero'), false, 'sin cristales no se reasigna');
+  s.res.crystals = 10;
+  assert.equal(GM.Loot.respec(s, 'guerrero'), true);
+  assert.equal(s.res.crystals, 10 - GM.CFG.perkRespec);
+  assert.ok(Math.abs(GM.D(s).hero.guerrero.dps - before) < 1e-6, 'vuelve al daño de antes');
+});
+
+test('las especializaciones sobreviven al ascenso (el nivel máximo se recuerda)', () => {
+  const s = fresh();
+  s.heroes.guerrero.lvl = 130; GM.Loot.noteLevel(s, 'guerrero'); GM.dirty(s);
+  GM.Loot.choosePerk(s, 'guerrero', 0, 0); GM.Loot.choosePerk(s, 'guerrero', 1, 0); GM.Loot.choosePerk(s, 'guerrero', 2, 0);
+  s.run.canAscend = true; GM.ascend(s);
+  assert.equal(s.heroes.guerrero.lvl, 1);
+  assert.equal(s.loot.perks.guerrero.filter((x) => x === 0).length, 3, 'las elecciones se mantienen');
+  assert.ok(GM.Loot.maxLvl(s, 'guerrero') >= 130);
+});
+
+/* ===================== Misiones, diaria, bestiario, goblin ===================== */
+
+test('misiones: siempre hay 3, avanzan con los eventos, se reclaman y se renuevan', () => {
+  const s = fresh(); GM.rand = GM.seeded(4);
+  GM.Loot.ensureQuests(s);
+  assert.equal(s.loot.quests.length, GM.CFG.questSlots);
+  assert.equal(new Set(s.loot.quests.map((q) => q.id)).size, GM.CFG.questSlots, 'tres misiones distintas');
+  const q = s.loot.quests[0];
+  q.p = q.goal; q.done = true;
+  const chests0 = GM.Loot.chestTotal(s);
+  assert.ok(GM.Loot.claimQuest(s, 0));
+  assert.equal(GM.Loot.chestTotal(s), chests0 + 1);
+  assert.equal(s.loot.quests.length, GM.CFG.questSlots, 'se repone');
+  assert.equal(s.stats.quests, 1);
+  assert.equal(GM.Loot.claimQuest(s, 0), null, 'una sin cumplir no se reclama');
+});
+
+test('misión de matar enemigos avanza con las bajas reales', () => {
+  const s = fresh();
+  s.loot.quests = [{ id: 'kills', goal: 3, p: 0, done: false, reward: 'bronce' }];
+  s.heroes.guerrero.lvl = 100; GM.dirty(s);
+  GM.advance(s, 60);
+  assert.ok(s.loot.quests[0].done, 'tras unas bajas se cumple');
+});
+
+test('recompensa diaria: una por día, racha con un día de perdón y reinicio tras faltar mucho', () => {
+  const s = fresh();
+  GM.Loot.today = () => '2026-03-10';
+  assert.equal(GM.Loot.dailyStatus(s).ready, true);
+  assert.equal(GM.Loot.claimDaily(s).streak, 1);
+  assert.equal(GM.Loot.claimDaily(s), null, 'solo una al día');
+  GM.Loot.today = () => '2026-03-11';
+  assert.equal(GM.Loot.claimDaily(s).streak, 2);
+  GM.Loot.today = () => '2026-03-13';                     // faltó un día: se perdona
+  assert.equal(GM.Loot.claimDaily(s).streak, 3);
+  GM.Loot.today = () => '2026-03-20';                     // faltó una semana: vuelve a empezar
+  assert.equal(GM.Loot.claimDaily(s).streak, 1);
+  assert.equal(s.stats.dailies, 4);
+  assert.equal(s.stats.streak, 3);
+  GM.Loot.today = () => '2026-03-01';                     // reloj hacia atrás: no regala
+  assert.equal(GM.Loot.dailyStatus(s).ready, false);
+  delete GM.Loot.today; GM.Loot.today = () => new Date().toISOString().slice(0, 10);
+});
+
+test('el día 7 de la racha da cofre de oro y la racha sigue en ciclos', () => {
+  const s = fresh();
+  for (let d = 1; d <= 8; d++) {
+    GM.Loot.today = () => '2026-04-' + String(d).padStart(2, '0');
+    const r = GM.Loot.claimDaily(s);
+    if (d === 7) { assert.equal(r.chest, 'oro'); assert.equal(r.day, 7); }
+    if (d === 8) assert.equal(r.day, 1);
+  }
+});
+
+test('cofre de bienvenida solo tras una ausencia larga', () => {
+  const s = fresh();
+  assert.equal(GM.Loot.welcome(s, 600), null);
+  assert.equal(GM.Loot.welcome(s, 3600), 'bronce');
+  assert.equal(GM.Loot.welcome(s, 6 * 3600), 'plata');
+});
+
+test('bestiario: cada hito de bajas de un tipo da cristales y daño', () => {
+  const s = fresh();
+  const d0 = GM.D(s).dmgMult;
+  s.kills.rata = 99;
+  s.run.enemy = { hp: 0, max: 1, dmg: 0, phys: 1, magic: 1, t: 0, gold: 1, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  const c0 = s.res.crystals;
+  GM.step(s, GM.DT);                                      // la baja 100 cruza el hito de 100
+  assert.ok(s.res.crystals > c0, 'cristales por el hito');
+  GM.dirty(s);
+  assert.ok(GM.D(s).dmgMult > d0, 'y +daño permanente');
+  assert.equal(GM.Loot.tierOf(100), 2); assert.equal(GM.Loot.tierOf(9), 0); assert.equal(GM.Loot.tierOf(10000), 4);
+});
+
+test('goblin del tesoro: aparece con el jugador delante, se atrapa a golpes y premia', () => {
+  const s = fresh(); GM.rand = GM.seeded(8);
+  s.evOn = true; s.stats.maxFloor = 6; s.loot.gobT = 0.1;
+  s.run.enemy = { hp: 1e30, max: 1e30, dmg: 0, phys: 1, magic: 1, t: 0, gold: 0, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  GM.step(s, 0.5);
+  assert.ok(s.loot.gob, 'aparece');
+  assert.equal(GM.Loot.hitGoblin(s), 'hit');
+  for (let i = 0; i < GM.CFG.goblinHits - 2; i++) GM.Loot.hitGoblin(s);
+  const plata0 = s.loot.chests.plata, g0 = s.res.gold;
+  assert.equal(GM.Loot.hitGoblin(s), 'caught');
+  assert.equal(s.loot.chests.plata, plata0 + 1);
+  assert.ok(s.res.gold > g0);
+  assert.equal(s.loot.gob, null);
+  assert.equal(s.stats.goblins, 1);
+  assert.equal(GM.Loot.hitGoblin(s), null, 'sin goblin no hay nada que golpear');
+});
+
+test('el goblin se escapa si no lo atrapas y no aparece sin conexión', () => {
+  const s = fresh();
+  s.evOn = true; s.stats.maxFloor = 6; s.loot.gob = { t: 0, life: 2, hits: 0, need: 6 };
+  s.run.enemy = { hp: 1e30, max: 1e30, dmg: 0, phys: 1, magic: 1, t: 0, gold: 0, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  for (let i = 0; i < 12; i++) GM.step(s, GM.DT);
+  assert.equal(s.loot.gob, null, 'se escapó');
+  const o = fresh(); o.evOn = false; o.stats.maxFloor = 6; o.loot.gobT = 0;
+  o.run.enemy = { hp: 1e30, max: 1e30, dmg: 0, phys: 1, magic: 1, t: 0, gold: 0, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  for (let i = 0; i < 12; i++) GM.step(o, GM.DT);
+  assert.equal(o.loot.gob, null, 'sin conexión no aparece');
+});
+
+test('los logros dan un cofre y las partidas antiguas se completan con la capa nueva', () => {
+  const s = fresh();
+  s.stats.kills = 1; GM.checkAchievements(s);
+  assert.ok(GM.Loot.chestTotal(s) >= 1, 'el primer logro da un cofre');
+  const old = JSON.parse(GM.serialize(s)); delete old.loot; delete old.fr; delete old.cmb;
+  const back = GM.deserialize(JSON.stringify(old));
+  assert.ok(back.loot && back.loot.chests && back.fr && back.cmb, 'una partida anterior a la capa se carga sin romper');
+  GM.advance(back, 30);
+});
+
+test('simulación larga con la capa nueva: sin NaN y con cofres abiertos', () => {
+  const s = fresh(); GM.rand = GM.seeded(21);
+  s.research.autocast = true; s.heroes.guerrero.lvl = 300; GM.dirty(s);
+  for (let i = 0; i < 6; i++) { GM.advance(s, 3600); GM.Loot.openAll(s); GM.Loot.claimAll(s); }
+  for (const k of ['gold', 'iron', 'crystals']) assert.ok(Number.isFinite(s.res[k]), k);
+  assert.ok(s.stats.chests > 0 && s.stats.crits > 100);
+});
+
+test('cofre por tiempo: cae cada cierto rato de juego, también sin conexión, y cada cuarto es de plata', () => {
+  const s = fresh();
+  const every = GM.CFG.timeChestEvery;
+  GM.advance(s, every * 4 + 5);
+  assert.equal(s.loot.chests.bronce >= 3, true, 'tres de bronce');
+  assert.equal(s.loot.chests.plata >= 1, true, 'el cuarto es de plata');
+  const o = fresh(); o.evOn = false;
+  GM.advance(o, every * 2 + 5);
+  assert.ok(GM.Loot.chestTotal(o) >= 2, 'también con el jugador fuera');
+});
+
+test('misión por tiempo: avanza con los minutos jugados', () => {
+  const s = fresh();
+  s.loot.quests = [{ id: 'time', goal: 1, p: 0, done: false, reward: 'bronce' }];
+  GM.advance(s, 70);
+  assert.ok(s.loot.quests[0].done);
 });

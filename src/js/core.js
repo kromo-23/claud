@@ -22,6 +22,18 @@
   GM.TALENT_BY_ID = TALENT_BY_ID;
   GM.BLD_BY_ID = BLD_BY_ID;
 
+  /* Bus de eventos del juego: otros módulos (loot.js) se suscriben con GM.on(nombre, (s, datos) => ...). */
+  const subs = {};
+  /** Suscribe una función a un evento del juego (kill, boss, floorUp, floorClear, cast, tap, crit, combo, frenzy, levels, gear, ach, tick, wipe). */
+  GM.on = function (name, fn) { (subs[name] || (subs[name] = [])).push(fn); };
+  function emit(s, name, data) {
+    const l = subs[name];
+    if (l) for (let i = 0; i < l.length; i++) l[i](s, data);
+  }
+  GM.emit = emit;
+  /** Funciones que suman efectos a las estadísticas: (s, X global, H por héroe) => void. */
+  GM.fxProviders = [];
+
   const DT = 0.25;            // paso fijo de simulación (s)
   const MAX_LEVEL = 1500;
   GM.DT = DT;
@@ -58,7 +70,11 @@
       ach: {},
       run: newRun(0),
       fx: { shieldT: 0, shieldV: 0, partyT: 0, partyV: 1 },
-      stats: { kills: 0, bossKills: 0, taps: 0, casts: 0, golden: 0, ascents: 0, maxFloor: 1, gearTiers: 0, goldTotal: 0, heroesHired: 1, wipes: 0 },
+      stats: { kills: 0, bossKills: 0, taps: 0, casts: 0, golden: 0, ascents: 0, maxFloor: 1, gearTiers: 0, goldTotal: 0, heroesHired: 1, wipes: 0,
+        crits: 0, combo: 0, frenzies: 0, chests: 0, relics: 0, relicsMaxed: 0, legendary: 0, quests: 0, goblins: 0, dailies: 0, streak: 0, perks: 0, bestiary: 0, topLevel: 1 },
+      fr: { m: 0, t: 0 },        // frenesí: barra (m) y tiempo restante (t)
+      cmb: { n: 0, t: 0 },       // combo de bajas seguidas
+      loot: GM.Loot ? GM.Loot.fresh() : {},
       kills: {},               // derrotas por tipo de enemigo (bestiario)
       flags: { autoCast: true, auto: true, speed: 1, ending: false, endless: false, story: {}, zoneBoss: {}, muted: false, vol: 0.5, buyN: 1 },
       t: { played: 0, saved: now, created: now },
@@ -91,11 +107,6 @@
   };
 
   function achCount(s) { return Object.keys(s.ach).length; }
-  function bestiaryCount(s) {
-    let n = 0;
-    for (const k of Object.keys(s.kills)) if (s.kills[k] >= 100) n++;
-    return n;
-  }
   function tl(s, id) { return s.talents[id] || 0; }
 
   /**
@@ -109,11 +120,16 @@
     const weapon = Math.pow(CFG.gearMult[0], s.gear[0]);
     const armor = Math.pow(CFG.gearMult[1], s.gear[1]);
     const amulet = Math.pow(CFG.gearMult[2], s.gear[2]);
-    const best = s.research.bestiario ? 1 + 0.01 * bestiaryCount(s) : 1;
     const tp = (id) => TALENT_BY_ID[id].per;
-    const dmgMult = (1 + tp('fuerza') * T('fuerza')) * (1 + CFG.ach * achN) * weapon * best;
-    let goldMult = (1 + tp('oro') * T('oro')) * (1 + BLD_BY_ID.mercado.per * s.bld.mercado) * amulet * (1 + CFG.ach * achN);
-    const hpMult = (1 + tp('vida') * T('vida')) * armor;
+    // Efectos de reliquias, especializaciones y bestiario (X global; H por héroe).
+    const X = { dmg: 0, hp: 0, gold: 0, iron: 0, crit: 0, critMul: 0, tap: 0, cd: 0, heal: 0, frenzy: 0, chest: 0, offline: 0, pdmg: 0 };
+    const H = {};
+    GM.HEROES.forEach((h) => { H[h.id] = { dmg: 0, hp: 0, crit: 0, heal: 0, cd: 0, abil: 0 }; });
+    for (const f of GM.fxProviders) f(s, X, H);
+    const dmgMult = (1 + tp('fuerza') * T('fuerza')) * (1 + CFG.ach * achN) * weapon * (1 + X.dmg) * (1 + X.pdmg);
+    let goldMult = (1 + tp('oro') * T('oro')) * (1 + BLD_BY_ID.mercado.per * s.bld.mercado) * amulet * (1 + CFG.ach * achN) * (1 + X.gold);
+    const hpMult = (1 + tp('vida') * T('vida')) * armor * (1 + X.hp);
+    const cdGlobal = Math.max(CFG.cdMin, 1 - tp('ritmo') * T('ritmo') - X.cd);
     // Aura del bardo y bonus de oro de la ladrona (solo si están en el equipo).
     let aura = 1;
     const inParty = (id) => s.party.indexOf(id) >= 0 && s.heroes[id].lvl > 0;
@@ -124,25 +140,32 @@
       const lvl = s.heroes[h.id].lvl;
       if (lvl <= 0) continue;
       const m = Math.pow(CFG.msMult, GM.milestoneCount(lvl));
+      const hx = H[h.id];
       hero[h.id] = {
         lvl: lvl,
-        dps: h.baseDps * lvl * m * dmgMult,
-        hpMax: h.baseHp * lvl * m * hpMult,
-        hps: h.heal * lvl * m * hpMult,
+        dps: h.baseDps * lvl * m * dmgMult * (1 + hx.dmg),
+        hpMax: h.baseHp * lvl * m * hpMult * (1 + hx.hp),
+        hps: h.heal * lvl * m * hpMult * (1 + hx.heal),
+        crit: Math.min(CFG.critCap, CFG.critBase + X.crit + hx.crit),
+        critMul: CFG.critMulBase + X.critMul,
+        abil: 1 + hx.abil,
+        cdMult: Math.max(CFG.cdMin, cdGlobal - hx.cd),
       };
     }
     const mina = s.bld.mina;
     s._d = {
       dmgMult: dmgMult, goldMult: goldMult, hpMult: hpMult, aura: aura,
       ironMult: 1 + tp('hierro') * T('hierro'),
-      cdMult: Math.max(CFG.cdMin, 1 - tp('ritmo') * T('ritmo')),
-      tapMult: (1 + tp('toque') * T('toque')) * (s.research.tap ? 3 : 1),
+      cdMult: cdGlobal,
+      tapMult: (1 + tp('toque') * T('toque')) * (s.research.tap ? 3 : 1) * (1 + X.tap),
+      frenzyGain: 1 + X.frenzy,
+      chestFind: 1 + X.chest,
       costMult: Math.max(CFG.costMin, 1 - tp('regateo') * T('regateo')),
-      offEff: Math.min(CFG.offEffMax, CFG.offlineBaseEff + tp('sueno') * T('sueno')),
+      offEff: Math.min(CFG.offEffMax, CFG.offlineBaseEff + tp('sueno') * T('sueno') + X.offline),
       offCapS: (CFG.offlineBaseCapH + (s.research.horas ? 4 : 0)) * 3600,
       goldenChance: CFG.goldenChance * (s.research.cofres ? 2 : 1),
       miningRate: mina > 0 ? BLD_BY_ID.mina.rate * mina * Math.pow(BLD_BY_ID.mina.growth, mina) : 0,
-      killHeal: CFG.killHeal + BLD_BY_ID.santuario.heal * s.bld.santuario,
+      killHeal: CFG.killHeal + BLD_BY_ID.santuario.heal * s.bld.santuario + X.heal,
       reviveHp: CFG.reviveHp + BLD_BY_ID.santuario.revive * s.bld.santuario,
       hero: hero,
     };
@@ -243,7 +266,7 @@
 
   function heroMult(s, id) {
     const hs = s.heroes[id];
-    return (hs.buffT > 0 ? hs.buffV : 1) * (s.fx.partyT > 0 ? s.fx.partyV : 1) * GM.D(s).aura;
+    return (hs.buffT > 0 ? hs.buffV : 1) * (s.fx.partyT > 0 ? s.fx.partyV : 1) * (s.fr.t > 0 ? CFG.frenzyDmg : 1) * GM.D(s).aura;
   }
 
   /**
@@ -306,7 +329,16 @@
     const r = s.run, e = r.enemy, D = GM.D(s);
     r.enemy = null;
     r.spawnT = CFG.spawnDelay;
-    const gm = D.goldMult * (s.fx.partyT > 0 ? s.fx.partyV : 1);
+    // Combo de bajas seguidas y frenesí.
+    s.cmb.n = s.cmb.t > 0 ? s.cmb.n + 1 : 1;
+    s.cmb.t = CFG.comboWindow;
+    if (s.cmb.n > s.stats.combo) s.stats.combo = s.cmb.n;
+    emit(s, 'combo', s.cmb.n);
+    if (s.fr.t <= 0 && s.fr.m < CFG.frenzyNeed) {
+      s.fr.m = Math.min(CFG.frenzyNeed, s.fr.m + CFG.frenzyKill * D.frenzyGain);
+      if (s.fr.m >= CFG.frenzyNeed) { ev(s, { t: 'frenzyReady' }); if (s.research.berserker) GM.startFrenzy(s); }
+    }
+    const gm = D.goldMult * (s.fx.partyT > 0 ? s.fx.partyV : 1) * (s.fr.t > 0 ? CFG.frenzyGold : 1) * (1 + Math.min(CFG.comboMax, s.cmb.n) * CFG.comboGold);
     const gold = e.gold * gm;
     addGold(s, gold);
     const iron = e.iron * D.ironMult;
@@ -322,7 +354,9 @@
       if (!s.flags.zoneBoss[zi]) { s.flags.zoneBoss[zi] = true; crystals += CFG.crystalZoneBoss; }
     }
     if (crystals) s.res.crystals += crystals;
-    ev(s, { t: 'kill', gold: gold, iron: iron, crystals: crystals, boss: e.boss, golden: e.golden });
+    ev(s, { t: 'kill', gold: gold, iron: iron, crystals: crystals, boss: e.boss, golden: e.golden, combo: s.cmb.n });
+    emit(s, 'kill', { e: e, gold: gold });
+    if (e.boss) emit(s, 'boss', { e: e, floor: r.floor });
     // Curación y revivir.
     for (const id of s.party) {
       if (!id) continue;
@@ -356,11 +390,13 @@
     }
     if (e.boss >= 2) bossDefeated(s, e);
     ev(s, { t: 'floor', floor: r.floor });
+    emit(s, 'floorClear', { floor: r.floor, boss: e.boss });
     const cap = GM.floorCap(s);
     if (r.mode === 'push' && s.flags.auto && r.floor < cap) {
       r.floor++;
       if (r.floor > r.maxFloor) r.maxFloor = r.floor;
       if (r.floor > s.stats.maxFloor) s.stats.maxFloor = r.floor;
+      emit(s, 'floorUp', { floor: r.floor });
     }
   }
 
@@ -392,6 +428,8 @@
       hs.down = false; hs.hpf = 1;
     }
     s.fx.shieldT = 0;
+    s.cmb.n = 0; s.cmb.t = 0;
+    emit(s, 'wipe', {});
     if (s.flags.auto && r.floor > 1) {
       r.floor--;
       r.mode = 'farm';
@@ -416,36 +454,38 @@
     const a = h.ability, D = GM.D(s), r = s.run, e = r.enemy;
     const needEnemy = a.kind === 'burst' || a.kind === 'goldBurst';
     if (needEnemy && !e) return false;
+    const ab = D.hero[id].abil;     // potencia de la habilidad (especializaciones)
     switch (a.kind) {
       case 'shield':
-        s.fx.shieldT = a.dur; s.fx.shieldV = a.value; break;
+        s.fx.shieldT = a.dur * ab; s.fx.shieldV = a.value; break;
       case 'burst': {
-        const dmg = D.hero[id].dps * heroMult(s, id) * a.value * (h.type === 'phys' ? e.phys : e.magic);
+        const dmg = D.hero[id].dps * heroMult(s, id) * a.value * ab * (h.type === 'phys' ? e.phys : e.magic);
         e.hp -= dmg; ev(s, { t: 'hit', id: id, v: dmg, big: true }); break;
       }
       case 'selfBuff':
-        hs.buffT = a.dur; hs.buffV = a.value; break;
+        hs.buffT = a.dur * ab; hs.buffV = a.value; break;
       case 'heal':
         for (const pid of s.party) {
           if (!pid) continue;
           const p = s.heroes[pid];
           if (p.lvl <= 0) continue;
-          if (p.down) { p.down = false; p.hpf = a.revive; } else p.hpf = Math.min(1, p.hpf + a.value);
+          if (p.down) { p.down = false; p.hpf = a.revive; } else p.hpf = Math.min(1, p.hpf + a.value * ab);
         }
         break;
       case 'goldBurst': {
         const dmg = D.hero[id].dps * heroMult(s, id) * a.dpsSecs * (h.type === 'phys' ? e.phys : e.magic);
         e.hp -= dmg;
-        const g = CFG.gold0 * GM.goldScale(r.floor) * a.value * D.goldMult * (s.fx.partyT > 0 ? s.fx.partyV : 1);
+        const g = CFG.gold0 * GM.goldScale(r.floor) * a.value * ab * D.goldMult * (s.fx.partyT > 0 ? s.fx.partyV : 1);
         addGold(s, g); ev(s, { t: 'hit', id: id, v: dmg, big: true }); ev(s, { t: 'gold', v: g });
         break;
       }
       case 'partyBuff':
-        s.fx.partyT = a.dur; s.fx.partyV = 1 + a.value; break;
+        s.fx.partyT = a.dur * ab; s.fx.partyV = 1 + a.value; break;
     }
-    hs.cd = a.cd * D.cdMult;
+    hs.cd = a.cd * D.hero[id].cdMult;
     s.stats.casts++;
     ev(s, { t: 'cast', id: id });
+    emit(s, 'cast', { id: id });
     return true;
   };
 
@@ -476,6 +516,8 @@
     const fx = s.fx;
     if (fx.shieldT > 0) fx.shieldT -= dt;
     if (fx.partyT > 0) fx.partyT -= dt;
+    if (s.cmb.t > 0) { s.cmb.t -= dt; if (s.cmb.t <= 0) s.cmb.n = 0; }
+    if (s.fr.t > 0) { s.fr.t -= dt; if (s.fr.t <= 0) { s.fr.t = 0; ev(s, { t: 'frenzyEnd' }); } }
     const autoOn = s.research.autocast && s.flags.autoCast;
     for (const id of s.party) {
       if (!id) continue;
@@ -501,13 +543,22 @@
     // Daño del equipo al enemigo.
     let dealt = 0;
     for (const id of alive) {
-      const d = D.hero[id].dps * heroMult(s, id) * (HERO_BY_ID[id].type === 'phys' ? e.phys : e.magic) * dt;
+      const hd = D.hero[id], hs = s.heroes[id];
+      const d = hd.dps * heroMult(s, id) * (HERO_BY_ID[id].type === 'phys' ? e.phys : e.magic) * dt;
       dealt += d;
-      const hs = s.heroes[id];
       hs.acc += d; hs.atkT += dt;
-      if (s.evOn && hs.atkT >= (HERO_BY_ID[id].atk || 1)) {
-        ev(s, { t: 'hit', id: id, v: hs.acc });
+      if (hs.atkT >= (HERO_BY_ID[id].atk || 1)) {
+        // Cada golpe visible puede ser crítico: el daño extra es real.
+        let v = hs.acc, crit = false;
+        if (GM.rand() < hd.crit) {
+          crit = true;
+          const extra = v * (hd.critMul - 1);
+          dealt += extra; v += extra;
+          s.stats.crits++;
+          emit(s, 'crit', { id: id });
+        }
         hs.atkT = 0; hs.acc = 0;
+        ev(s, { t: 'hit', id: id, v: v, crit: crit });
       }
     }
     e.hp -= dealt;
@@ -542,6 +593,20 @@
     // Logros y automatización periódica.
     s._achT += dt;
     if (s._achT >= 2) { s._achT = 0; GM.checkAchievements(s); }
+    emit(s, 'tick', dt);
+  };
+
+  /**
+   * Activa el frenesí si la barra está llena: durante unos segundos más daño y más oro.
+   * @returns {boolean} true si se activó.
+   */
+  GM.startFrenzy = function (s) {
+    if (s.fr.t > 0 || s.fr.m < CFG.frenzyNeed) return false;
+    s.fr.t = CFG.frenzyDur; s.fr.m = 0;
+    s.stats.frenzies++;
+    ev(s, { t: 'frenzy' });
+    emit(s, 'frenzy', {});
+    return true;
   };
 
   /**
@@ -571,7 +636,12 @@
     const dmg = Math.max(1, GM.partyDps(s, e.phys, e.magic) * CFG.tapFrac * D.tapMult);
     e.hp -= dmg;
     s.stats.taps++;
+    if (s.fr.t <= 0 && s.fr.m < CFG.frenzyNeed) {
+      s.fr.m = Math.min(CFG.frenzyNeed, s.fr.m + CFG.frenzyTap * D.frenzyGain);
+      if (s.fr.m >= CFG.frenzyNeed) { ev(s, { t: 'frenzyReady' }); if (s.research.berserker) GM.startFrenzy(s); }
+    }
     ev(s, { t: 'tap', v: dmg });
+    emit(s, 'tap', {});
     return dmg;
   };
 
@@ -614,7 +684,9 @@
       // Si hay hueco libre en el equipo, entra directamente.
       const free = s.party.indexOf(null);
       if (free >= 0 && free < s.slots && s.party.indexOf(id) < 0) s.party[free] = id;
+      if (hs.lvl > s.stats.topLevel) s.stats.topLevel = hs.lvl;
       GM.dirty(s);
+      emit(s, 'hire', { id: id });
       return 1;
     }
     const max = GM.maxLevels(s, id);
@@ -622,7 +694,9 @@
     if (k <= 0) return 0;
     s.res.gold -= GM.levelCost(s, id, k);
     hs.lvl += k;
+    if (hs.lvl > s.stats.topLevel) s.stats.topLevel = hs.lvl;
     GM.dirty(s);
+    emit(s, 'levels', { id: id, n: k });
     return k;
   };
 
@@ -643,6 +717,7 @@
     s.gear[line]++;
     s.stats.gearTiers++;
     GM.dirty(s);
+    emit(s, 'gear', { line: line });
     return true;
   };
 
@@ -793,7 +868,7 @@
     const got = [];
     for (const a of GM.ACHIEVEMENTS) {
       if (s.ach[a.id]) continue;
-      if (statValue(s, a.stat) >= a.n) { s.ach[a.id] = true; got.push(a.id); ev(s, { t: 'ach', id: a.id }); }
+      if (statValue(s, a.stat) >= a.n) { s.ach[a.id] = true; got.push(a.id); ev(s, { t: 'ach', id: a.id }); emit(s, 'ach', a); }
     }
     if (got.length) GM.dirty(s);
     return got;
