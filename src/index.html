@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#201a3a">
+  <meta name="description" content="Gremio de Mala Muerte: un juego incremental de rol con humor. Juega en PC y móvil.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Gremio de Mala Muerte</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">⚔️ <span>Gremio de Mala Muerte</span></div>
+    <div class="resources">
+      <div class="res" id="r-gold" title="Oro">🪙 <b>0</b></div>
+      <div class="res" id="r-iron" title="Hierro" hidden>⛏️ <b>0</b></div>
+      <div class="res" id="r-gem" title="Cristales" hidden>💎 <b>0</b></div>
+      <div class="res" id="r-star" title="Estrellas" hidden>⭐ <b>0</b></div>
+    </div>
+  </header>
+
+  <main id="layout">
+    <section id="battle" aria-label="Combate">
+      <div id="stage">
+        <canvas id="cv" width="512" height="288" aria-label="Escena de combate: toca al enemigo para golpearlo"></canvas>
+        <div id="fx"></div>
+      </div>
+      <div id="info">
+        <div class="line1"><b id="zone-name"></b><span id="rank-label"></span><span id="floor-label"></span></div>
+        <div id="enemy-bar"><div class="fill"></div><span class="txt"></span></div>
+        <div class="line3">
+          <div id="kill-dots" aria-hidden="true"></div>
+          <div id="controls">
+            <button class="ctl" data-ctl="down" title="Piso anterior">◀</button>
+            <button class="ctl" data-ctl="up" title="Piso siguiente">▶</button>
+            <button class="ctl on" data-ctl="auto" title="Avance automático">⏩ Auto</button>
+            <button class="ctl" data-ctl="speed" title="Velocidad" hidden>×1</button>
+            <button class="ctl on" data-ctl="autocast" title="Lanzar habilidades solo" hidden>🤖</button>
+          </div>
+        </div>
+        <div id="zone-tip" class="tip"></div>
+      </div>
+      <div id="abilities" aria-label="Habilidades"></div>
+    </section>
+
+    <section id="right">
+      <div id="panel"><div id="tab-body"></div></div>
+      <nav id="tabs" aria-label="Secciones">
+        <button data-tab="heroes" class="on"><span>🛡️</span>Héroes</button>
+        <button data-tab="city"><span>🏘️</span>Ciudad</button>
+        <button data-tab="ascend"><span>⭐</span>Ascenso</button>
+        <button data-tab="more"><span>☰</span>Más</button>
+      </nav>
+    </section>
+  </main>
+</div>
+<div id="toasts" aria-live="polite"></div>
+<div id="modal-root"></div>
+
+<script src="js/data.js"></script>
+<script src="js/floors.js"></script>
+<script src="js/util.js"></script>
+<script src="js/core.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -94,6 +94,9 @@
   // Segundos entre golpes visibles de cada héroe (solo afecta a la animación).
   const ATK = { guerrero: 1.0, maga: 1.4, arquero: 0.6, clerigo: 1.6, ladrona: 0.7, bardo: 1.5 };
   GM.HEROES.forEach((h) => { h.atk = ATK[h.id]; });
+  // Nombre corto de la habilidad para los botones de la pantalla de combate.
+  const SHORT = { guerrero: 'Escudo', maga: 'Fuego', arquero: 'Flechas', clerigo: 'Plegaria', ladrona: 'Robo', bardo: 'Canción' };
+  GM.HEROES.forEach((h) => { h.ability.short = SHORT[h.id]; });
 
   /**
    * Tipos de enemigo. res: multiplicador de daño recibido (1 = normal).

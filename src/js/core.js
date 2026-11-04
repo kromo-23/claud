@@ -170,6 +170,21 @@
     return (s.run.rank + 1) * CFG.floorsPerRank;
   };
 
+  /**
+   * Cambia de piso a mano (solo hasta el piso más alto alcanzado en este recorrido).
+   * Desactiva el avance automático para que el equipo se quede farmeando ahí.
+   * @returns {boolean} true si se cambió.
+   */
+  GM.setFloor = function (s, f) {
+    const r = s.run;
+    f = Math.floor(f);
+    if (!(f >= 1) || f > r.maxFloor || f === r.floor) return false;
+    r.floor = f; r.kills = 0; r.enemy = null; r.spawnT = CFG.spawnDelay;
+    r.mode = 'push'; r.farmLeft = 0; r.wipePower = 0; r.waits = 0;
+    s.flags.auto = false;
+    return true;
+  };
+
   /* ---------------------------------------------------------------- enemigos */
 
   function makeEnemy(s) {

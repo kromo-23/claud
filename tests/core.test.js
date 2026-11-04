@@ -336,3 +336,15 @@ test('simulación larga: sin NaN ni valores infinitos', () => {
   for (const k of ['gold', 'iron', 'crystals']) assert.ok(Number.isFinite(s.res[k]), k);
   assert.ok(Number.isFinite(s.run.floor));
 });
+
+test('cambiar de piso a mano: solo hasta el máximo del recorrido y desactiva el avance', () => {
+  const s = fresh();
+  s.run.floor = 8; s.run.maxFloor = 8;
+  assert.equal(GM.setFloor(s, 9), false, 'no se puede saltar más allá del máximo');
+  assert.equal(GM.setFloor(s, 8), false, 'ya está ahí');
+  assert.equal(GM.setFloor(s, 0), false);
+  assert.equal(GM.setFloor(s, 5), true);
+  assert.equal(s.run.floor, 5);
+  assert.equal(s.flags.auto, false);
+  assert.equal(s.run.kills, 0);
+});
