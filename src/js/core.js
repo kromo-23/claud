@@ -247,6 +247,24 @@
   }
 
   /**
+   * Héroe que recibe los golpes directos del enemigo: el que sigue en pie y tiene más aggro
+   * (si hay empate, el primero del equipo). Es el "tanque". null si todo el equipo ha caído.
+   * @param {object} s Estado.
+   * @returns {string|null}
+   */
+  GM.tankId = function (s) {
+    let best = null, top = -1;
+    for (const id of s.party) {
+      if (!id) continue;
+      const hs = s.heroes[id];
+      if (hs.lvl <= 0 || hs.down) continue;
+      const a = HERO_BY_ID[id].aggro;
+      if (a > top) { top = a; best = id; }
+    }
+    return best;
+  };
+
+  /**
    * Daño por segundo del equipo contra un enemigo con las resistencias dadas.
    * @param {object} s Estado.
    * @param {number} [phys=1] Multiplicador de daño físico recibido.
@@ -499,11 +517,11 @@
     const edps = e.dmg * (1 + zone.mech.enrage * e.t);
     const poison = edps * zone.mech.poison;
     const direct = (edps - poison) * (fx.shieldT > 0 ? 1 - fx.shieldV : 1);
-    let aggro = 0;
-    for (const id of alive) aggro += HERO_BY_ID[id].aggro;
+    // Los golpes directos los recibe solo el tanque (el vivo con más aggro); el veneno afecta a todos por igual.
+    const tank = GM.tankId(s);
     for (const id of alive) {
       const hs = s.heroes[id], hd = D.hero[id];
-      const dmg = direct * (HERO_BY_ID[id].aggro / aggro) + poison / alive.length;
+      const dmg = (id === tank ? direct : 0) + poison / alive.length;
       hs.hpf -= (dmg * dt) / hd.hpMax;
     }
     // Curación (el clérigo cura al más herido).

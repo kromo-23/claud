@@ -138,6 +138,7 @@ img.px { image-rendering: pixelated; image-rendering: crisp-edges; }
 .slot.full img { width: 40px; height: 40px; }
 .slot.locked { opacity: .55; }
 .slot small { color: var(--muted); font-weight: 600; }
+.tankcap { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
 /* Estadísticas y logros */
 .statgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }

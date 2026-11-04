@@ -122,6 +122,14 @@
     ctx.restore();
   }
 
+  /** Escudito sobre el héroe que recibe los golpes (el tanque). */
+  function shieldIcon(x, y) {
+    ctx.fillStyle = '#1a1c2c'; ctx.fillRect(x - 1, y - 1, 8, 8);
+    ctx.fillStyle = '#41a6f6'; ctx.fillRect(x, y, 6, 4);
+    ctx.fillStyle = '#73eff7'; ctx.fillRect(x, y, 6, 1);
+    ctx.fillStyle = '#41a6f6'; ctx.fillRect(x + 1, y + 4, 4, 1); ctx.fillRect(x + 2, y + 5, 2, 1);
+  }
+
   function bar(x, y, w, frac, col) {
     ctx.fillStyle = '#1a1c2c'; ctx.fillRect(x - 1, y - 1, w + 2, 4);
     ctx.fillStyle = col; ctx.fillRect(x, y, Math.max(0, Math.round(w * frac)), 2);
@@ -181,6 +189,7 @@
       ctx.fillRect(lx, FEET - 40, rx - lx, 44);
       ctx.strokeStyle = 'rgba(115,239,247,0.8)'; ctx.lineWidth = 1; ctx.strokeRect(lx + 0.5, FEET - 39.5, rx - lx - 1, 43);
     }
+    const tankId = r.enemy ? GM.tankId(s) : null;
     party.forEach((id, i) => {
       const hs = s.heroes[id], h = hero(id), p = heroPos(i);
       h.lunge = Math.max(0, h.lunge - dt); h.cast = Math.max(0, h.cast - dt); h.hurt = Math.max(0, h.hurt - dt);
@@ -201,6 +210,7 @@
       if (h.cast > 0) { ctx.fillStyle = 'rgba(255,205,117,' + (h.cast).toFixed(2) + ')'; ctx.fillRect(x + 4, y + 30, 24, 2); }
       drawSprite(id, x, y, 2, h.hurt > 0 ? 'white' : null);
       bar(x + 5, y - 4, 22, hs.hpf, hs.hpf > 0.5 ? '#38b764' : hs.hpf > 0.25 ? '#ffcd75' : '#b13e53');
+      if (id === tankId) shieldIcon(x + 13, y - 13);
       if (s.fx.partyT > 0 && Math.sin(time * 14 + i) > 0.6) { ctx.fillStyle = '#ffcd75'; ctx.fillRect(x + 4 + (i * 7) % 20, y + 2, 2, 2); }
       if (hs.buffT > 0) { ctx.fillStyle = 'rgba(177,62,83,0.4)'; ctx.fillRect(x + 6, y + 31, 20, 1); }
       // Veneno.

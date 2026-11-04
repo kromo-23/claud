@@ -154,7 +154,7 @@
       mech: { poison: 0, enrage: 0 }, tip: 'Sin reglas especiales. Aquí se aprende.',
       intro: 'El Gremio de Mala Muerte lleva tres meses sin pagar el alquiler. Abajo, en el sótano, unas ratas sindicalistas exigen vacaciones pagadas. Alguien tiene que bajar.' },
     { id: 1, name: 'Bosque Cutre', bg: 'bosque', enemies: ['goblin', 'lobo', 'seta'],
-      mech: { poison: 0.35, enrage: 0 }, tip: 'Veneno: parte del daño ignora al tanque. Un sanador ayuda mucho.',
+      mech: { poison: 0.35, enrage: 0 }, tip: 'Veneno: parte del daño ignora al tanque y daña a todos. Un sanador ayuda mucho.',
       intro: 'Más allá del sótano hay un bosque. Se llama "Bosque Cutre" porque el cartel de "Bosque Encantado" costaba extra.' },
     { id: 2, name: 'Cripta de los Morosos', bg: 'cripta', enemies: ['esqueleto', 'fantasma', 'zombi'],
       mech: { poison: 0, enrage: 0 }, tip: 'Muertos vivientes: resisten los golpes físicos. Lleva magia.',

@@ -438,7 +438,9 @@
       else if (id) slots += `<button class="slot full" data-act="slot" data-i="${i}"><img class="px" src="${portrait(id)}"><small>${GM.HERO_BY_ID[id].name}</small></button>`;
       else slots += `<button class="slot" data-act="slot" data-i="${i}"><span>＋</span><small>Libre</small></button>`;
     }
-    rows.push({ key: 'party', cls: 'party', html: `<div class="slots">${slots}</div>` });
+    const tank = GM.tankId(S);
+    const cap = tank ? `🛡️ Recibe los golpes: <b>${GM.HERO_BY_ID[tank].name}</b> (el de más aggro). El veneno daña a todos.` : '';
+    rows.push({ key: 'party', cls: 'party', html: `<div class="slots">${slots}</div>${cap ? `<div class="tankcap">${cap}</div>` : ''}` });
     if (!S.flags.hintDone) {
       rows.push({ key: 'hint', cls: 'hint', html: '👆 <b>Toca al enemigo</b> para golpearlo y <b>sube de nivel</b> a tus héroes con el oro. ¡Los héroes pelean solos!' });
     }

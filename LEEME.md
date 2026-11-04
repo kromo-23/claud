@@ -2,7 +2,7 @@
 
 Un **juego incremental de rol con humor** para móvil y PC. Diriges un gremio de aventureros en quiebra: tus héroes luchan solos por una mazmorra de 100 pisos para derrotar a **Lord Casero**, el casero que sube el alquiler de todo el reino. Dura **unas 10 horas** y tiene final.
 
-- Equipo de hasta 4 héroes de 6 clases (Guerrero, Maga, Arquero, Clérigo, Ladrona, Bardo) con hitos de poder y habilidades activas.
+- Equipo de hasta 4 héroes de 6 clases (Guerrero, Maga, Arquero, Clérigo, Ladrona, Bardo) con hitos de poder y habilidades activas. **El de más aggro (el tanque) recibe todos los golpes directos**; el veneno de algunas zonas daña a todos.
 - Una ciudad que mejora con el botín: Herrería, Mercado, Mina, Santuario, Barracones y Biblioteca.
 - 5 zonas con reglas propias (veneno, resistencias, furia...) y jefes con diálogos.
 - 4 **Ascensos de Rango** (prestigio) con estrellas ⭐ y 10 talentos permanentes, 28 logros.

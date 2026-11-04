@@ -348,3 +348,48 @@ test('cambiar de piso a mano: solo hasta el máximo del recorrido y desactiva el
   assert.equal(s.flags.auto, false);
   assert.equal(s.run.kills, 0);
 });
+
+/** Equipo de prueba: maga (primera del equipo) + guerrero, frente a un enemigo que no muere. */
+function tankScenario(floor, enemyDmg) {
+  const s = fresh();
+  s.stats.maxFloor = 8; s.slots = 3;
+  s.heroes.maga.lvl = 10; s.heroes.arquero.lvl = 10; s.heroes.guerrero.lvl = 10;
+  s.party = ['maga', 'guerrero', 'arquero', null];
+  s.run.floor = floor; s.run.maxFloor = floor;
+  GM.dirty(s);
+  s.run.enemy = { hp: 1e30, max: 1e30, dmg: enemyDmg, phys: 1, magic: 1, t: 0, gold: 0, iron: 0, type: 'rata', name: 'x', sprite: 'rata', boss: 0, golden: false };
+  return s;
+}
+
+test('el tanque recibe todo el daño directo y los demás no reciben nada', () => {
+  const s = tankScenario(5, 20);                      // piso 5: sin veneno
+  GM.step(s, 1);
+  assert.ok(s.heroes.guerrero.hpf < 1, 'el guerrero (más aggro) recibe los golpes');
+  assert.equal(s.heroes.maga.hpf, 1, 'la maga no recibe daño directo');
+  assert.equal(s.heroes.arquero.hpf, 1, 'el arquero tampoco');
+  assert.equal(GM.tankId(s), 'guerrero');
+});
+
+test('si el tanque cae, los golpes pasan al siguiente con más aggro', () => {
+  const s = tankScenario(5, 20);
+  s.heroes.guerrero.down = true; s.heroes.guerrero.hpf = 0;
+  GM.step(s, 1);
+  assert.equal(GM.tankId(s), 'arquero', 'el arquero (aggro 1.5) pasa a ser el objetivo');
+  assert.ok(s.heroes.arquero.hpf < 1);
+  assert.equal(s.heroes.maga.hpf, 1);
+});
+
+test('el veneno de la zona sigue afectando a todo el equipo aunque haya tanque', () => {
+  const s = tankScenario(25, 20);                     // bosque: veneno
+  GM.step(s, 1);
+  assert.ok(s.heroes.maga.hpf < 1, 'la maga sufre el veneno');
+  assert.ok(s.heroes.arquero.hpf < 1, 'el arquero también');
+  assert.ok(s.heroes.guerrero.hpf < s.heroes.maga.hpf || s.heroes.guerrero.hpf < 1, 'y el tanque sufre además los golpes');
+});
+
+test('el escudo reduce el daño directo que recibe el tanque', () => {
+  const a = tankScenario(5, 20), b = tankScenario(5, 20);
+  b.fx.shieldT = 8; b.fx.shieldV = 0.6;
+  GM.step(a, 1); GM.step(b, 1);
+  assert.ok(1 - b.heroes.guerrero.hpf < (1 - a.heroes.guerrero.hpf) * 0.5);
+});
