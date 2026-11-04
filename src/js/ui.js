@@ -235,6 +235,7 @@
       case 'import': importSave(); sound = 'click'; break;
       case 'savenow': host.save(true); UI.toast('Partida guardada.', 'good'); sound = 'click'; break;
       case 'wipe': resetGame(); sound = 'click'; break;
+      case 'cloud': host.cloud(id); sound = 'click'; break;
       default: sound = 'click';
     }
     GM.Audio.play(ok ? sound : 'deny');
@@ -467,6 +468,25 @@
     return rows;
   }
 
+  /** Fila de estado de la nube (Más → Partida en la nube). */
+  function cloudRow() {
+    const C = GM.Cloud;
+    let text, buttons = '';
+    if (C.status === 'on') {
+      text = `Guardada en tu cuenta de claude.ai${C.lastPushAt ? ' · ' + C.ago(C.lastPushAt) : ''}. Abre el mismo enlace en otro dispositivo para seguir donde lo dejaste.`;
+      buttons = '<button class="btn small" data-act="cloud" data-id="up">Subir ahora</button><button class="btn small" data-act="cloud" data-id="down">Cargar</button>';
+    } else if (C.status === 'connecting') {
+      text = 'Conectando con tu cuenta...';
+    } else if (C.status === 'error') {
+      text = 'No se pudo conectar con la nube. Tu partida sigue guardada en este dispositivo.';
+      buttons = '<button class="btn small" data-act="cloud" data-id="retry">Reintentar</button>';
+    } else {
+      text = 'Solo en este dispositivo. Para llevar tu partida a cualquier sitio, abre el juego desde su enlace de claude.ai con tu sesión iniciada, o usa Exportar/Importar.';
+    }
+    const ico = C.status === 'on' ? '☁️' : C.status === 'error' ? '⚠️' : '📴';
+    return { key: 'cloud', cls: 'card', html: `<div class="ico">${ico}</div><div class="grow"><b>Partida en la nube</b><div class="muted">${text}</div></div>${buttons ? `<div class="actions">${buttons}</div>` : ''}` };
+  }
+
   function moreRows() {
     const rows = [];
     const st = S.stats;
@@ -475,6 +495,7 @@
       <div class="actions"><button class="btn small" data-act="mute">${S.flags.muted ? 'Activar' : 'Silenciar'}</button></div>` });
     rows.push({ key: 'save', cls: 'card', html: `<div class="ico">💾</div><div class="grow"><b>Partida</b><div class="muted">Se guarda sola cada pocos segundos en este navegador.</div></div>
       <div class="actions"><button class="btn small" data-act="savenow">Guardar</button><button class="btn small" data-act="export">Exportar</button><button class="btn small" data-act="import">Importar</button></div>` });
+    rows.push(cloudRow());
     rows.push({ key: 'h-stat', cls: 'sect', html: '📊 <b>Estadísticas</b>' });
     const lines = [
       ['Tiempo jugado', GM.fmtTime(S.t.played)], ['Piso máximo', st.maxFloor], ['Ascensos', st.ascents], ['Enemigos derrotados', fmt(st.kills)],
