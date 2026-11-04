@@ -1,0 +1,17 @@
+name: Pruebas
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      # El simulador comprueba que la partida sigue durando lo previsto (el bot termina en 6-11 h).
+      - run: node tools/sim.js '{}' --hours 16 | tee sim.txt && grep -q "FINAL alcanzado" sim.txt

@@ -3,6 +3,7 @@
   --bg: #17132a; --bg2: #201a3a; --card: #2a2250; --card2: #3a306b; --line: #4a3f86;
   --text: #f4f0ff; --muted: #a9a1d4; --gold: #ffcd75; --good: #a7f070; --bad: #ef7d57; --accent: #73eff7;
   --radius: 10px;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
@@ -17,7 +18,7 @@ small { font-size: 0.82em; }
 .bad { color: var(--bad); }
 img.px { image-rendering: pixelated; image-rendering: crisp-edges; }
 
-#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 1400px; margin: 0 auto; }
+#app { display: flex; flex-direction: column; height: 100%; max-width: 1400px; margin: 0 auto; }
 
 /* Barra superior */
 #topbar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;

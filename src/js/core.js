@@ -47,7 +47,7 @@
     const now = Date.now();
     const s = {
       v: 1,
-      res: { gold: 5, iron: 0, crystals: 0, stars: 0, starsTotal: 0 },
+      res: { gold: CFG.startGold, iron: 0, crystals: 0, stars: 0, starsTotal: 0 },
       heroes: heroes,
       party: ['guerrero', null, null, null],
       slots: 1,
@@ -112,7 +112,7 @@
     const best = s.research.bestiario ? 1 + 0.01 * bestiaryCount(s) : 1;
     const tp = (id) => TALENT_BY_ID[id].per;
     const dmgMult = (1 + tp('fuerza') * T('fuerza')) * (1 + CFG.ach * achN) * weapon * best;
-    let goldMult = (1 + tp('oro') * T('oro')) * (1 + 0.08 * s.bld.mercado) * amulet * (1 + CFG.ach * achN);
+    let goldMult = (1 + tp('oro') * T('oro')) * (1 + BLD_BY_ID.mercado.per * s.bld.mercado) * amulet * (1 + CFG.ach * achN);
     const hpMult = (1 + tp('vida') * T('vida')) * armor;
     // Aura del bardo y bonus de oro de la ladrona (solo si están en el equipo).
     let aura = 1;
@@ -135,15 +135,15 @@
     s._d = {
       dmgMult: dmgMult, goldMult: goldMult, hpMult: hpMult, aura: aura,
       ironMult: 1 + tp('hierro') * T('hierro'),
-      cdMult: Math.max(0.3, 1 - tp('ritmo') * T('ritmo')),
+      cdMult: Math.max(CFG.cdMin, 1 - tp('ritmo') * T('ritmo')),
       tapMult: (1 + tp('toque') * T('toque')) * (s.research.tap ? 3 : 1),
-      costMult: Math.max(0.4, 1 - tp('regateo') * T('regateo')),
-      offEff: Math.min(0.95, CFG.offlineBaseEff + tp('sueno') * T('sueno')),
+      costMult: Math.max(CFG.costMin, 1 - tp('regateo') * T('regateo')),
+      offEff: Math.min(CFG.offEffMax, CFG.offlineBaseEff + tp('sueno') * T('sueno')),
       offCapS: (CFG.offlineBaseCapH + (s.research.horas ? 4 : 0)) * 3600,
       goldenChance: CFG.goldenChance * (s.research.cofres ? 2 : 1),
-      miningRate: mina > 0 ? 0.25 * mina * Math.pow(1.1, mina) : 0,
-      killHeal: CFG.killHeal + 0.02 * s.bld.santuario,
-      reviveHp: CFG.reviveHp + 0.04 * s.bld.santuario,
+      miningRate: mina > 0 ? BLD_BY_ID.mina.rate * mina * Math.pow(BLD_BY_ID.mina.growth, mina) : 0,
+      killHeal: CFG.killHeal + BLD_BY_ID.santuario.heal * s.bld.santuario,
+      reviveHp: CFG.reviveHp + BLD_BY_ID.santuario.revive * s.bld.santuario,
       hero: hero,
     };
     return s._d;
@@ -199,7 +199,7 @@
     if (isBoss) {
       if (f % CFG.floorsPerRank === 0) {
         const B = GM.BOSSES[Math.min(4, f / CFG.floorsPerRank - 1)];
-        boss = f >= 100 && f % 100 === 0 ? 3 : 2;
+        boss = f >= CFG.finalFloor && f % CFG.finalFloor === 0 ? 3 : 2;
         bossCfg = boss === 3 ? CFG.bossFinal : CFG.bossZone;
         name = B.name; sprite = B.sprite; phys = B.phys; magic = B.magic;
         T = { hp: 1, dmg: 1, gold: 1 };
@@ -217,13 +217,13 @@
     }
     const D = GM.D(s);
     const golden = !isBoss && GM.rand() < D.goldenChance;
-    const hp = CFG.enemyHp0 * scale * T.hp * bossCfg.hp * (golden ? 1.5 : 1);
+    const hp = CFG.enemyHp0 * scale * T.hp * bossCfg.hp * (golden ? CFG.goldenHp : 1);
     return {
       type: typeId, name: golden ? 'Dorado: ' + name : name, sprite: sprite, boss: boss, golden: golden,
       hp: hp, max: hp,
       dmg: CFG.enemyDmg0 * Math.pow(scale, CFG.dmgExp) * T.dmg * bossCfg.dmg,
-      gold: CFG.gold0 * GM.goldScale(f) * T.gold * bossCfg.gold * (golden ? 8 : 1),
-      iron: (0.5 + 0.06 * f) * (isBoss ? 5 : 1) * (golden ? 2 : 1),
+      gold: CFG.gold0 * GM.goldScale(f) * T.gold * bossCfg.gold * (golden ? CFG.goldenGold : 1),
+      iron: (CFG.ironBase + CFG.ironPerFloor * f) * (isBoss ? CFG.ironBoss : 1) * (golden ? CFG.goldenIron : 1),
       phys: phys, magic: magic, t: 0,
     };
   }
@@ -297,11 +297,11 @@
     s.kills[e.type] = (s.kills[e.type] || 0) + 1;
     if (e.boss) s.stats.bossKills++;
     let crystals = 0;
-    if (e.golden) { s.stats.golden++; if (GM.rand() < 0.1) crystals += 1; }
-    if (e.boss === 1 && GM.rand() < 0.2) crystals += 1;
+    if (e.golden) { s.stats.golden++; if (GM.rand() < CFG.crystalGolden) crystals += 1; }
+    if (e.boss === 1 && GM.rand() < CFG.crystalMini) crystals += 1;
     if (e.boss >= 2) {
       const zi = GM.zoneIndex(r.floor);
-      if (!s.flags.zoneBoss[zi]) { s.flags.zoneBoss[zi] = true; crystals += 6; }
+      if (!s.flags.zoneBoss[zi]) { s.flags.zoneBoss[zi] = true; crystals += CFG.crystalZoneBoss; }
     }
     if (crystals) s.res.crystals += crystals;
     ev(s, { t: 'kill', gold: gold, iron: iron, crystals: crystals, boss: e.boss, golden: e.golden });
@@ -319,7 +319,7 @@
       if (r.farmLeft <= 0 && s.flags.auto) {
         // Tras una derrota, no reintenta hasta ser algo más fuerte (o tras unos cuantos intentos de espera).
         if (r.wipePower && GM.powerScore(s) < r.wipePower * CFG.retryGain && r.waits < CFG.retryMaxWaits) {
-          r.farmLeft = 5; r.waits++;
+          r.farmLeft = CFG.retryWaitKills; r.waits++;
         } else {
           r.mode = 'push'; r.wipePower = 0; r.waits = 0;
         }
@@ -350,7 +350,7 @@
     const r = s.run;
     const zi = GM.zoneIndex(r.floor);
     ev(s, { t: 'bossDown', zone: zi, floor: r.floor });
-    if (r.floor === 100 && !s.flags.ending) {
+    if (r.floor === CFG.finalFloor && !s.flags.ending) {
       s.flags.ending = true;
       s.flags.endless = true;
       r.canAscend = true;
@@ -358,7 +358,7 @@
     } else if (r.floor === GM.floorCap(s) && r.rank < 5 && !s.flags.endless) {
       r.canAscend = true;
     }
-    if (r.floor >= 100 && s.flags.endless) r.canAscend = true;
+    if (r.floor >= CFG.finalFloor && s.flags.endless) r.canAscend = true;
   }
 
   function wipe(s) {
@@ -366,7 +366,7 @@
     r.wipes++;
     s.stats.wipes++;
     r.enemy = null;
-    r.spawnT = 1.5;
+    r.spawnT = CFG.wipeDelay;
     r.kills = 0;
     for (const id of s.party) {
       if (!id) continue;
@@ -377,7 +377,7 @@
     if (s.flags.auto && r.floor > 1) {
       r.floor--;
       r.mode = 'farm';
-      r.farmLeft = 8;
+      r.farmLeft = CFG.wipeFarmKills;
       r.wipePower = GM.powerScore(s);
       r.waits = 0;
     }
@@ -412,11 +412,11 @@
           if (!pid) continue;
           const p = s.heroes[pid];
           if (p.lvl <= 0) continue;
-          if (p.down) { p.down = false; p.hpf = 0.4; } else p.hpf = Math.min(1, p.hpf + a.value);
+          if (p.down) { p.down = false; p.hpf = a.revive; } else p.hpf = Math.min(1, p.hpf + a.value);
         }
         break;
       case 'goldBurst': {
-        const dmg = D.hero[id].dps * heroMult(s, id) * 8 * (h.type === 'phys' ? e.phys : e.magic);
+        const dmg = D.hero[id].dps * heroMult(s, id) * a.dpsSecs * (h.type === 'phys' ? e.phys : e.magic);
         e.hp -= dmg;
         const g = CFG.gold0 * GM.goldScale(r.floor) * a.value * D.goldMult * (s.fx.partyT > 0 ? s.fx.partyV : 1);
         addGold(s, g); ev(s, { t: 'hit', id: id, v: dmg, big: true }); ev(s, { t: 'gold', v: g });
@@ -437,7 +437,7 @@
       for (const pid of s.party) {
         if (!pid) continue;
         const p = s.heroes[pid];
-        if (p.lvl > 0 && (p.down || p.hpf < 0.55)) return true;
+        if (p.lvl > 0 && (p.down || p.hpf < CFG.autoHealBelow)) return true;
       }
       return false;
     }
@@ -539,7 +539,7 @@
       GM.step(s, DT);
       if (auto && s.research.contable) {
         s._buyT += DT;
-        if (s._buyT >= 20) { s._buyT = 0; GM.accountant(s); }
+        if (s._buyT >= CFG.accountantEvery) { s._buyT = 0; GM.accountant(s); }
       }
     }
     return n * DT;
@@ -590,7 +590,7 @@
       if (s.stats.maxFloor < h.hireFloor) return 0;
       if (s.res.gold < h.hireCost) return 0;
       s.res.gold -= h.hireCost;
-      hs.lvl = 1 + 8 * tl(s, 'veteranos');
+      hs.lvl = 1 + TALENT_BY_ID.veteranos.per * tl(s, 'veteranos');
       hs.hpf = 1; hs.down = false;
       s.stats.heroesHired = GM.HEROES.filter((x) => s.heroes[x.id].lvl > 0).length;
       // Si hay hueco libre en el equipo, entra directamente.
@@ -707,7 +707,7 @@
 
   /** Contable Goblin: gasta hasta la mitad del oro en subir niveles de los héroes del equipo. */
   GM.accountant = function (s) {
-    let budget = s.res.gold * 0.5;
+    let budget = s.res.gold * CFG.accountantShare;
     for (let guard = 0; guard < 40; guard++) {
       let best = null, bestCost = Infinity;
       for (const id of s.party) {
@@ -745,14 +745,14 @@
     const rank = Math.min(5, s.run.rank + 1);
     const oldRank = s.run.rank;
     s.run = newRun(rank);
-    s.res.gold = 5 * Math.pow(4, tl(s, 'herencia'));
+    s.res.gold = CFG.startGold * Math.pow(CFG.herenciaGrowth, tl(s, 'herencia'));
     s.res.iron = 0;
     s.gear = [0, 0, 0];
     s.bld = { mercado: 0, mina: 0, santuario: 0 };
     for (const h of GM.HEROES) {
       const hs = s.heroes[h.id];
       hs.hpf = 1; hs.down = false; hs.cd = 0; hs.buffT = 0; hs.acc = 0;
-      if (hs.lvl > 0) hs.lvl = 1 + 8 * tl(s, 'veteranos');
+      if (hs.lvl > 0) hs.lvl = 1 + TALENT_BY_ID.veteranos.per * tl(s, 'veteranos');
     }
     s.fx = { shieldT: 0, shieldV: 0, partyT: 0, partyV: 1 };
     GM.dirty(s);

@@ -91,7 +91,7 @@
         let n = 0;
         while (acc >= GM.DT && n < 48) {
           GM.step(S, GM.DT); acc -= GM.DT; n++;
-          if (S.research.contable) { S._buyT += GM.DT; if (S._buyT >= 20) { S._buyT = 0; GM.accountant(S); } }
+          if (S.research.contable) { S._buyT += GM.DT; if (S._buyT >= GM.CFG.accountantEvery) { S._buyT = 0; GM.accountant(S); } }
         }
         if (n >= 48) acc = 0;
         S.t.played += dt;

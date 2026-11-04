@@ -305,7 +305,7 @@
       onClose: (v, m) => {
         if (v !== 'copy') return true;
         const ta = $('#exp', m); ta.select();
-        try { navigator.clipboard.writeText(code); } catch (e) { document.execCommand('copy'); }
+        try { navigator.clipboard.writeText(code).catch(() => { try { document.execCommand('copy'); } catch (e2) { /* se puede copiar a mano */ } }); } catch (e) { try { document.execCommand('copy'); } catch (e2) { /* se puede copiar a mano */ } }
         UI.toast('Código copiado.', 'good');
         return false;
       } });

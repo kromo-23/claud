@@ -40,6 +40,21 @@
     offlineBaseEff: 0.5,
     offlineBaseCapH: 8,
     ach: 0.02,             // bonus de daño/oro por logro
+    startGold: 5,          // oro inicial de cada recorrido
+    herenciaGrowth: 4,     // el talento Herencia multiplica el oro inicial por esto por nivel
+    wipeFarmKills: 8,      // enemigos que se farmean tras caer antes de reintentar
+    retryWaitKills: 5,     // tanda de espera extra si aún no es más fuerte
+    wipeDelay: 1.5,        // pausa tras caer (s)
+    goldenHp: 1.5, goldenGold: 8, goldenIron: 2,
+    ironBase: 0.5, ironPerFloor: 0.06, ironBoss: 5,
+    crystalGolden: 0.1, crystalMini: 0.2, crystalZoneBoss: 6,
+    cdMin: 0.3,            // el enfriamiento no baja de esta fracción
+    costMin: 0.4,          // el descuento de coste no baja de esta fracción
+    offEffMax: 0.95,
+    accountantShare: 0.5,  // parte del oro que gasta el Contable Goblin
+    accountantEvery: 20,   // cada cuántos segundos actúa
+    autoHealBelow: 0.55,   // el auto-lanzado de curación espera a que alguien baje de esto
+    finalFloor: 100,
   };
 
   /** Rangos del gremio. Cada ascenso abre 20 pisos más. */
@@ -74,13 +89,13 @@
       quote: '"Fallé a propósito. Era una flecha de advertencia."' },
     { id: 'clerigo', name: 'Hno. Ramón', cls: 'Clérigo', role: 'Sanador', type: 'magic',
       baseDps: 2, baseHp: 52, aggro: 1, heal: 3, hireFloor: 14, hireCost: 2.5e5, costBase: 3.5e4,
-      ability: { name: 'Plegaria Express', kind: 'heal', cd: 40, value: 0.6,
+      ability: { name: 'Plegaria Express', kind: 'heal', cd: 40, value: 0.6, revive: 0.4,
         desc: 'Cura un 60% de la vida a todos y revive a los caídos.' },
       quote: '"Rezo por vosotros. El seguro médico no cubre esto."' },
     { id: 'ladrona', name: 'Lola', cls: 'Ladrona', role: 'Oro y críticos', type: 'phys',
       baseDps: 7, baseHp: 40, aggro: 1.2, heal: 0, hireFloor: 25, hireCost: 6e7, costBase: 7e6,
       goldPerLevel: 0.01,
-      ability: { name: 'Guantes de Seda', kind: 'goldBurst', cd: 35, value: 12,
+      ability: { name: 'Guantes de Seda', kind: 'goldBurst', cd: 35, value: 12, dpsSecs: 8,
         desc: 'Golpe bajo y roba de golpe el oro de 12 enemigos.' },
       quote: '"No es robar si el dueño está muerto."' },
     { id: 'bardo', name: 'Tomás', cls: 'Bardo', role: 'Apoyo', type: 'magic',
@@ -165,11 +180,11 @@
 
   /** Edificios de la ciudad (los que suben de nivel). */
   GM.BUILDINGS = [
-    { id: 'mercado', name: 'Mercado Chapucero', icon: '🏪', unlock: 1, max: 40, gold0: 100, goldG: 2.0,
+    { id: 'mercado', name: 'Mercado Chapucero', icon: '🏪', unlock: 1, max: 40, gold0: 100, goldG: 2.0, per: 0.08,
       desc: '+8% de oro por nivel.', effect: (l) => `+${l * 8}% oro` },
-    { id: 'mina', name: 'Mina de Hierro', icon: '⛏️', unlock: 5, max: 40, gold0: 400, goldG: 2.1,
+    { id: 'mina', name: 'Mina de Hierro', icon: '⛏️', unlock: 5, max: 40, gold0: 400, goldG: 2.1, rate: 0.25, growth: 1.1,
       desc: 'Produce hierro continuamente.', effect: (l) => `${(0.25 * l * Math.pow(1.1, l)).toFixed(1)} hierro/s` },
-    { id: 'santuario', name: 'Santuario', icon: '⛪', unlock: 10, max: 15, gold0: 1500, goldG: 2.6,
+    { id: 'santuario', name: 'Santuario', icon: '⛪', unlock: 10, max: 15, gold0: 1500, goldG: 2.6, heal: 0.02, revive: 0.04,
       desc: 'Más curación al matar y los caídos vuelven con más vida.', effect: (l) => `+${l * 2}% cura / +${l * 4}% revivir` },
   ];
 
